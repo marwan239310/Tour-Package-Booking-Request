@@ -2,6 +2,7 @@
 const express = require("express");
 const cors = require("cors");
 require("dotenv").config();
+const requestRoutes = require("./routes/requestRoutes");   // NEW: loads your routes file
 
 const app = express();
 
@@ -12,6 +13,8 @@ app.use(express.json());  // reads JSON from request bodies
 app.get("/", (req, res) => {
   res.json({ message: "The booking request service is running" });
 });
+
+app.use("/requests", requestRoutes);   // NEW: every /requests URL goes to your routes
 
 const PORT = process.env.PORT || 3003;
 app.listen(PORT, () => {
