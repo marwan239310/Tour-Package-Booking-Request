@@ -1,4 +1,5 @@
 const requestService = require("../services/requestService");
+const notificationService = require("../services/notificationService");
 
 // Function 1 - GET /requests?status=&packageID=&date=
 function listRequests(req, res) {
@@ -22,7 +23,8 @@ function listRequests(req, res) {
 
 // Function 2 - PATCH /requests/:requestID/status
 // Body: { "status": "...", "reason": "...", "note": "..." }
-function updateRequestStatus(req, res) {
+// Function 3 - after the status changes, email the customer
+async function updateRequestStatus(req, res) {
   const { requestID } = req.params;
   const { status, reason, note } = req.body || {};
 
@@ -58,7 +60,16 @@ function updateRequestStatus(req, res) {
     if (!updated) {
       return res.status(404).json({ message: "Booking request not found" });
     }
-    res.status(200).json(updated);
+
+    // Function 3: send the email. If it fails, the status change is still saved.
+    let emailSent = false;
+    try {
+      emailSent = await notificationService.sendStatusEmail(updated);
+    } catch (emailError) {
+      console.log("Email not sent:", emailError.message);
+    }
+
+    res.status(200).json({ ...updated, emailSent });
   } catch (error) {
     res.status(error.statusCode || 500).json({ message: error.message });
   }
