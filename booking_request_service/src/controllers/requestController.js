@@ -1,6 +1,6 @@
 const requestService = require("../services/requestService");
 
-// GET /requests?status=&packageID=&date=
+// Function 1 - GET /requests?status=&packageID=&date=
 function listRequests(req, res) {
   const { status, packageID, date } = req.query;
 
@@ -20,6 +20,61 @@ function listRequests(req, res) {
   res.status(200).json(requests);
 }
 
+// Function 2 - PATCH /requests/:requestID/status
+// Body: { "status": "...", "reason": "...", "note": "..." }
+function updateRequestStatus(req, res) {
+  const { requestID } = req.params;
+  const { status, reason, note } = req.body || {};
+
+  // 1. The new status is required and must exist
+  if (!status) {
+    return res.status(400).json({ message: "The new status is required" });
+  }
+  if (!requestService.STATUSES.includes(status)) {
+    return res.status(400).json({
+      message: `Invalid status. Allowed: ${requestService.STATUSES.join(", ")}`
+    });
+  }
+
+  // 2. Rejecting needs a reason (text of at least 5 characters)
+  if (status === "rejected" && (typeof reason !== "string" || reason.trim().length < 5)) {
+    return res.status(400).json({
+      message: "A reason of at least 5 characters is required to reject a request"
+    });
+  }
+
+  // 3. The staff note is optional, but must be text and not too long
+  if (note !== undefined && (typeof note !== "string" || note.length > 300)) {
+    return res.status(400).json({ message: "The staff note must be text of 300 characters or less" });
+  }
+
+  try {
+    const updated = requestService.updateStatus(
+      requestID,
+      status,
+      typeof reason === "string" ? reason.trim() : undefined,
+      note ? note.trim() : undefined
+    );
+    if (!updated) {
+      return res.status(404).json({ message: "Booking request not found" });
+    }
+    res.status(200).json(updated);
+  } catch (error) {
+    res.status(error.statusCode || 500).json({ message: error.message });
+  }
+}
+
+// GET /requests/:requestID/history
+function getRequestHistory(req, res) {
+  const { requestID } = req.params;
+  if (!requestService.getRequestByID(requestID)) {
+    return res.status(404).json({ message: "Booking request not found" });
+  }
+  res.status(200).json(requestService.getHistory(requestID));
+}
+
 module.exports = {
-  listRequests
+  listRequests,
+  updateRequestStatus,
+  getRequestHistory
 };
