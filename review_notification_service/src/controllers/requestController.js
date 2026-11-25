@@ -1,5 +1,5 @@
 const requestService = require("../services/requestService");
-const notificationService = require("../services/notificationService");
+const snsService = require("../services/snsService");
 
 // Function 1 - GET /requests?status=&packageID=&date=
 function listRequests(req, res) {
@@ -23,7 +23,7 @@ function listRequests(req, res) {
 
 // Function 2 - PATCH /requests/:requestID/status
 // Body: { "status": "...", "reason": "...", "note": "..." }
-// Function 3 - after the status changes, email the customer
+// Function 3 - after the status changes, publish it to SNS (SNS then triggers the email)
 async function updateRequestStatus(req, res) {
   const { requestID } = req.params;
   const { status, reason, note } = req.body || {};
@@ -61,15 +61,16 @@ async function updateRequestStatus(req, res) {
       return res.status(404).json({ message: "Booking request not found" });
     }
 
-    // Function 3: send the email. If it fails, the status change is still saved.
-    let emailSent = false;
+    // Function 3: announce the change on SNS. If it fails, the status change is still saved.
+    let notificationPublished = false;
     try {
-      emailSent = await notificationService.sendStatusEmail(updated);
-    } catch (emailError) {
-      console.log("Email not sent:", emailError.message);
+      await snsService.publishStatusChange(updated);
+      notificationPublished = true;
+    } catch (snsError) {
+      console.log("SNS publish failed:", snsError.message);
     }
 
-    res.status(200).json({ ...updated, emailSent });
+    res.status(200).json({ ...updated, notificationPublished });
   } catch (error) {
     res.status(error.statusCode || 500).json({ message: error.message });
   }
