@@ -2,7 +2,7 @@
 const express = require("express");
 const cors = require("cors");
 require("dotenv").config();
-const requestRoutes = require("./routes/requestRoutes");   // NEW: loads your routes file
+const requestRoutes = require("./routes/requestRoutes");   // loads the routes file
 
 const app = express();
 
@@ -11,12 +11,12 @@ app.use(express.json());  // reads JSON from request bodies
 
 // Health check: shows the service is running
 app.get("/", (req, res) => {
-  res.json({ message: "The booking request service is running" });
+  res.json({ message: "The review and notification service is running" });
 });
 
-app.use("/requests", requestRoutes);   // NEW: every /requests URL goes to your routes
+app.use("/requests", requestRoutes);   // every /requests URL goes to the routes
 
 const PORT = process.env.PORT || 3003;
 app.listen(PORT, () => {
-  console.log(`The booking request service is running on port ${PORT}`);
+  console.log(`The review and notification service is running on port ${PORT}`);
 });
