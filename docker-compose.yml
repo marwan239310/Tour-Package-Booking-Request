@@ -11,6 +11,10 @@ services:
       - ./package_service/src/.env
     environment:
       - PORT=3001
+      - AWS_REGION=us-east-1
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+      - DYNAMODB_ENDPOINT=http://host.docker.internal:4566
     restart: unless-stopped
 
   frontend:

@@ -1,126 +1,134 @@
 
-const pool = require("../config/db");
+const { randomUUID } = require("crypto");
+const {
+    ScanCommand,
+    GetCommand,
+    PutCommand,
+    UpdateCommand
+} = require("@aws-sdk/lib-dynamodb");
+
+const dynamodb = require("../config/dynamodb");
+
+const TABLE_NAME = "Packages";
+
+function formatPackage(item) {
+    if (!item) return null;
+
+    return {
+        packageID: item.packageId,
+        title: item.title,
+        destination: item.destination,
+        itinerary: item.itinerary,
+        startDate: item.startDate,
+        endDate: item.endDate,
+        price: item.price,
+        totalSeats: item.totalSeats,
+        seatsLeft: item.seatsLeft,
+        isPublished: item.isPublished
+    };
+}
 
 async function getAllPackages(filters = {}) {
-    let query = `
-        SELECT
-            package_id AS "packageID",
-            title,
-            destination,
-            itinerary,
-            start_date AS "startDate",
-            end_date AS "endDate",
-            price,
-            total_seats AS "totalSeats",
-            seats_left AS "seatsLeft",
-            is_published AS "isPublished"
-        FROM packages
-        WHERE is_published = TRUE
-    `;
+    let items = [];
+    let lastKey;
 
-    const values = [];
-    let index = 1;
+    do {
+        const result = await dynamodb.send(
+            new ScanCommand({
+                TableName: TABLE_NAME,
+                ExclusiveStartKey: lastKey
+            })
+        );
 
-    if (filters.destination) {
-        query += ` AND LOWER(destination) LIKE LOWER($${index})`;
-        values.push(`%${filters.destination}%`);
-        index++;
-    }
+        items = items.concat(result.Items || []);
+        lastKey = result.LastEvaluatedKey;
+    } while (lastKey);
 
-    if (filters.date) {
-        query += ` AND start_date = $${index}`;
-        values.push(filters.date);
-        index++;
-    }
-
-    if (filters.maxPrice !== undefined && filters.maxPrice !== "") {
-        query += ` AND price <= $${index}`;
-        values.push(Number(filters.maxPrice));
-        index++;
-    }
-
-    const result = await pool.query(query, values);
-    return result.rows;
+    return items
+        .filter(pkg => pkg.isPublished === true)
+        .filter(pkg =>
+            !filters.destination ||
+            pkg.destination.toLowerCase().includes(
+                filters.destination.toLowerCase()
+            )
+        )
+        .filter(pkg =>
+            !filters.date || pkg.startDate === filters.date
+        )
+        .filter(pkg =>
+            filters.maxPrice === undefined ||
+            filters.maxPrice === "" ||
+            Number(pkg.price) <= Number(filters.maxPrice)
+        )
+        .map(formatPackage);
 }
 
 async function getPackageByID(packageID) {
-    const result = await pool.query(
-        `SELECT
-            package_id AS "packageID",
-            title,
-            destination,
-            itinerary,
-            start_date AS "startDate",
-            end_date AS "endDate",
-            price,
-            total_seats AS "totalSeats",
-            seats_left AS "seatsLeft",
-            is_published AS "isPublished"
-         FROM packages
-         WHERE package_id = $1`,
-        [packageID]
+    const result = await dynamodb.send(
+        new GetCommand({
+            TableName: TABLE_NAME,
+            Key: {
+                packageId: packageID
+            }
+        })
     );
 
-    return result.rows[0] || null;
+    return formatPackage(result.Item);
 }
 
 async function createPackage(data) {
-    const result = await pool.query(
-        `INSERT INTO packages
-            (title, destination, itinerary, start_date, end_date,
-             price, total_seats, seats_left, is_published)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $7, FALSE)
-         RETURNING
-            package_id AS "packageID",
-            title,
-            destination,
-            itinerary,
-            start_date AS "startDate",
-            end_date AS "endDate",
-            price,
-            total_seats AS "totalSeats",
-            seats_left AS "seatsLeft",
-            is_published AS "isPublished"`,
-        [
-            data.title,
-            data.destination,
-            JSON.stringify(data.itinerary || []),
-            data.startDate,
-            data.endDate,
-            Number(data.price),
-            Number(data.totalSeats)
-        ]
+    const newPackage = {
+        packageId: randomUUID(),
+        title: data.title,
+        destination: data.destination,
+        itinerary: data.itinerary || [],
+        startDate: data.startDate,
+        endDate: data.endDate,
+        price: Number(data.price),
+        totalSeats: Number(data.totalSeats),
+        seatsLeft: Number(data.totalSeats),
+        isPublished: false
+    };
+
+    await dynamodb.send(
+        new PutCommand({
+            TableName: TABLE_NAME,
+            Item: newPackage,
+            ConditionExpression: "attribute_not_exists(packageId)"
+        })
     );
 
-    return result.rows[0];
+    return formatPackage(newPackage);
 }
 
 async function updatePackage(packageID, data) {
-    const allowedFields = {
-        title: "title",
-        destination: "destination",
-        itinerary: "itinerary",
-        startDate: "start_date",
-        endDate: "end_date",
-        price: "price",
-        totalSeats: "total_seats",
-        isPublished: "is_published"
-    };
+    const allowedFields = [
+        "title",
+        "destination",
+        "itinerary",
+        "startDate",
+        "endDate",
+        "price",
+        "totalSeats",
+        "isPublished"
+    ];
 
+    const names = {};
+    const values = {};
     const updates = [];
-    const values = [];
 
-    for (const [key, column] of Object.entries(allowedFields)) {
-        if (data[key] !== undefined) {
-            let value = data[key];
+    for (const field of allowedFields) {
+        if (data[field] !== undefined) {
+            names[`#${field}`] = field;
 
-            if (key === "price") value = Number(value);
-            if (key === "totalSeats") value = Number(value);
-            if (key === "isPublished") value = Boolean(value);
-            if (key === "itinerary") value = JSON.stringify(value);
+            let value = data[field];
 
-            values.push(value);
-            updates.push(`${column} = $${values.length}`);
+            if (field === "price" || field === "totalSeats") {
+                value = Number(value);
+            }
+
+            values[`:${field}`] = value;
+            updates.push(`#${field} = :${field}`);
         }
     }
 
@@ -128,60 +136,66 @@ async function updatePackage(packageID, data) {
         return getPackageByID(packageID);
     }
 
-    values.push(packageID);
+    try {
+        const result = await dynamodb.send(
+            new UpdateCommand({
+                TableName: TABLE_NAME,
+                Key: {
+                    packageId: packageID
+                },
+                UpdateExpression: `SET ${updates.join(", ")}`,
+                ExpressionAttributeNames: names,
+                ExpressionAttributeValues: values,
+                ConditionExpression: "attribute_exists(packageId)",
+                ReturnValues: "ALL_NEW"
+            })
+        );
 
-    const result = await pool.query(
-        `UPDATE packages
-         SET ${updates.join(", ")}
-         WHERE package_id = $${values.length}
-         RETURNING
-            package_id AS "packageID",
-            title,
-            destination,
-            itinerary,
-            start_date AS "startDate",
-            end_date AS "endDate",
-            price,
-            total_seats AS "totalSeats",
-            seats_left AS "seatsLeft",
-            is_published AS "isPublished"`,
-        values
-    );
+        return formatPackage(result.Attributes);
+    } catch (error) {
+        if (error.name === "ConditionalCheckFailedException") {
+            return null;
+        }
 
-    return result.rows[0] || null;
+        throw error;
+    }
 }
 
 async function updateSeats(packageID, seatsLeft) {
-    const result = await pool.query(
-        `UPDATE packages
-         SET seats_left = $1
-         WHERE package_id = $2
-         AND $1 >= 0
-         AND $1 <= total_seats
-         RETURNING
-            package_id AS "packageID",
-            title,
-            destination,
-            itinerary,
-            start_date AS "startDate",
-            end_date AS "endDate",
-            price,
-            total_seats AS "totalSeats",
-            seats_left AS "seatsLeft",
-            is_published AS "isPublished"`,
-        [seatsLeft, packageID]
-    );
+    try {
+        const result = await dynamodb.send(
+            new UpdateCommand({
+                TableName: TABLE_NAME,
+                Key: {
+                    packageId: packageID
+                },
+                UpdateExpression: "SET seatsLeft = :seatsLeft",
+                ExpressionAttributeValues: {
+                    ":seatsLeft": seatsLeft,
+                    ":zero": 0
+                },
+                ConditionExpression:
+                    "attribute_exists(packageId) AND :seatsLeft >= :zero AND :seatsLeft <= totalSeats",
+                ReturnValues: "ALL_NEW"
+            })
+        );
 
-    if (result.rows.length === 0) {
-        const existing = await getPackageByID(packageID);
+        return formatPackage(result.Attributes);
+    } catch (error) {
+        if (error.name === "ConditionalCheckFailedException") {
+            const existing = await getPackageByID(packageID);
 
-        if (!existing) return null;
+            if (!existing) return null;
 
-        throw new Error("Seats left must be between 0 and total seats");
+            throw new Error(
+                "Seats left must be between 0 and total seats"
+            );
+        }
+
+        throw error;
     }
-
-    return result.rows[0];
 }
+
 module.exports = {
     getAllPackages,
     getPackageByID,

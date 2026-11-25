@@ -3,8 +3,10 @@ const express = require("express");
 const cors = require("cors");
 require("dotenv").config();
 
+const { DescribeTableCommand } = require("@aws-sdk/client-dynamodb");
+const dynamodb = require("./config/dynamodb");
+
 const packageRoutes = require("./routes/packageRoutes");
-const pool = require("./config/db");
 
 const app = express();
 
@@ -17,22 +19,28 @@ app.get("/", (req, res) => {
 
 app.get("/health", async (req, res) => {
     try {
-        await pool.query("SELECT NOW()");
+        await dynamodb.send(
+            new DescribeTableCommand({
+                TableName: "Packages"
+            })
+        );
+
         res.status(200).json({
             status: "OK",
-            database: "Connected"
+            database: "DynamoDB Connected"
         });
     } catch (error) {
+        console.error("DynamoDB health check failed:", error);
+
         res.status(500).json({
             status: "Error",
-            database: "Disconnected"
+            database: "DynamoDB Disconnected"
         });
     }
 });
 
 app.use("/packages", packageRoutes);
 
-// Start the server locally only.
 if (require.main === module) {
     const PORT = process.env.PORT || 3001;
 
