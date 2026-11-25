@@ -5,7 +5,8 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node src/server.js"
+    "start": "node src/server.js",
+    "zip": "node scripts/zip-lambda.js"
   },
   "keywords": [],
   "author": "",
@@ -18,6 +19,7 @@
     "@aws-sdk/lib-dynamodb": "^3.1177.0",
     "cors": "^2.8.6",
     "dotenv": "^18.0.10",
-    "express": "^4.22.3"
+    "express": "^4.22.3",
+    "serverless-http": "^3.2.0"
   }
 }

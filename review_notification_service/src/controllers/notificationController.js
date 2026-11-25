@@ -8,7 +8,9 @@ async function handleSnsMessage(req, res) {
   // SNS sends its body as text, so we read it as text and turn it into an object
   let payload;
   try {
-    payload = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
+    // NEW: inside Lambda the body can arrive as raw bytes (a Buffer), so turn it into text first
+    const body = Buffer.isBuffer(req.body) ? req.body.toString("utf8") : req.body;
+    payload = typeof body === "string" ? JSON.parse(body) : body;
   } catch (error) {
     return res.status(400).send("Invalid SNS message");
   }
@@ -42,7 +44,6 @@ async function handleSnsMessage(req, res) {
       return res.status(400).send("Invalid message content");
     }
 
-    // NEW: read the request from DynamoDB (await = wait for the database)
     let request;
     try {
       request = await requestService.getRequestByID(message.requestID);
