@@ -1,0 +1,29 @@
+
+services:
+  package-service:
+    build:
+      context: ./package_service/src
+      dockerfile: Dockerfile
+    container_name: tour-package-backend
+    ports:
+      - "3001:3001"
+    env_file:
+      - ./package_service/src/.env
+    environment:
+      - PORT=3001
+      - AWS_REGION=us-east-1
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+      - DYNAMODB_ENDPOINT=http://host.docker.internal:4566
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./Frontend
+      dockerfile: Dockerfile
+    container_name: tour-package-frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      - package-service
+    restart: unless-stopped

@@ -1,26 +1,84 @@
+
 const { randomUUID } = require("crypto");
+const {
+    ScanCommand,
+    GetCommand,
+    PutCommand,
+    UpdateCommand
+} = require("@aws-sdk/lib-dynamodb");
 
-let packages = [];
+const dynamodb = require("../config/dynamodb");
 
-function getAllPackages(filters = {}) {
-    return packages.filter((pkg) => {
-        if (!pkg.isPublished) 
-        return false;
-    if (filters.destination && !pkg.destination.toLowerCase().includes(filters.destination.toLowerCase())
-    ) return false;
-if (filters.date && pkg.startDate !== filters.date) return false;
-if (filters.maxPrice && pkg.price > Number(filters.maxPrice)) return false;
-return true;
-    });
+const TABLE_NAME = "Packages";
+
+function formatPackage(item) {
+    if (!item) return null;
+
+    return {
+        packageID: item.packageId,
+        title: item.title,
+        destination: item.destination,
+        itinerary: item.itinerary,
+        startDate: item.startDate,
+        endDate: item.endDate,
+        price: item.price,
+        totalSeats: item.totalSeats,
+        seatsLeft: item.seatsLeft,
+        isPublished: item.isPublished
+    };
 }
 
-function getPackageByID(packageID) {
-    return packages.find((pkg) => pkg.packageID === packageID);
+async function getAllPackages(filters = {}) {
+    let items = [];
+    let lastKey;
+
+    do {
+        const result = await dynamodb.send(
+            new ScanCommand({
+                TableName: TABLE_NAME,
+                ExclusiveStartKey: lastKey
+            })
+        );
+
+        items = items.concat(result.Items || []);
+        lastKey = result.LastEvaluatedKey;
+    } while (lastKey);
+
+    return items
+        .filter(pkg => pkg.isPublished === true)
+        .filter(pkg =>
+            !filters.destination ||
+            pkg.destination.toLowerCase().includes(
+                filters.destination.toLowerCase()
+            )
+        )
+        .filter(pkg =>
+            !filters.date || pkg.startDate === filters.date
+        )
+        .filter(pkg =>
+            filters.maxPrice === undefined ||
+            filters.maxPrice === "" ||
+            Number(pkg.price) <= Number(filters.maxPrice)
+        )
+        .map(formatPackage);
 }
 
-function createPackage(data){
+async function getPackageByID(packageID) {
+    const result = await dynamodb.send(
+        new GetCommand({
+            TableName: TABLE_NAME,
+            Key: {
+                packageId: packageID
+            }
+        })
+    );
+
+    return formatPackage(result.Item);
+}
+
+async function createPackage(data) {
     const newPackage = {
-        packageID: randomUUID(),
+        packageId: randomUUID(),
         title: data.title,
         destination: data.destination,
         itinerary: data.itinerary || [],
@@ -29,41 +87,119 @@ function createPackage(data){
         price: Number(data.price),
         totalSeats: Number(data.totalSeats),
         seatsLeft: Number(data.totalSeats),
-        isPublished: false,
+        isPublished: false
     };
-    packages.push(newPackage);
-    return newPackage;
+
+    await dynamodb.send(
+        new PutCommand({
+            TableName: TABLE_NAME,
+            Item: newPackage,
+            ConditionExpression: "attribute_not_exists(packageId)"
+        })
+    );
+
+    return formatPackage(newPackage);
 }
 
-function updatePackage(packageID, data) {
-    const pkg = getPackageByID(packageID);
-    if (!pkg) return null;
+async function updatePackage(packageID, data) {
+    const allowedFields = [
+        "title",
+        "destination",
+        "itinerary",
+        "startDate",
+        "endDate",
+        "price",
+        "totalSeats",
+        "isPublished"
+    ];
 
-    Object.assign(pkg, data);
+    const names = {};
+    const values = {};
+    const updates = [];
 
-    if (data.price !== undefined) {
-        pkg.price = Number(data.price);
+    for (const field of allowedFields) {
+        if (data[field] !== undefined) {
+            names[`#${field}`] = field;
+
+            let value = data[field];
+
+            if (field === "price" || field === "totalSeats") {
+                value = Number(value);
+            }
+
+            values[`:${field}`] = value;
+            updates.push(`#${field} = :${field}`);
+        }
     }
-    if (data.isPublished !== undefined) {
-        pkg.isPublished = Boolean(data.isPublished);
+
+    if (updates.length === 0) {
+        return getPackageByID(packageID);
     }
-    return pkg;
+
+    try {
+        const result = await dynamodb.send(
+            new UpdateCommand({
+                TableName: TABLE_NAME,
+                Key: {
+                    packageId: packageID
+                },
+                UpdateExpression: `SET ${updates.join(", ")}`,
+                ExpressionAttributeNames: names,
+                ExpressionAttributeValues: values,
+                ConditionExpression: "attribute_exists(packageId)",
+                ReturnValues: "ALL_NEW"
+            })
+        );
+
+        return formatPackage(result.Attributes);
+    } catch (error) {
+        if (error.name === "ConditionalCheckFailedException") {
+            return null;
+        }
+
+        throw error;
+    }
 }
 
-function updateSeats(packageID, seatsLeft){
-    const pkg = getPackageByID(packageID);
-    if (!pkg) return null;
-    if (!Number.isInteger(seatsLeft) || seatsLeft < 0 || seatsLeft > pkg.totalSeats) {
-        throw new Error("Seats left must be 0 and total seats cannot be 0")
+async function updateSeats(packageID, seatsLeft) {
+    try {
+        const result = await dynamodb.send(
+            new UpdateCommand({
+                TableName: TABLE_NAME,
+                Key: {
+                    packageId: packageID
+                },
+                UpdateExpression: "SET seatsLeft = :seatsLeft",
+                ExpressionAttributeValues: {
+                    ":seatsLeft": seatsLeft,
+                    ":zero": 0
+                },
+                ConditionExpression:
+                    "attribute_exists(packageId) AND :seatsLeft >= :zero AND :seatsLeft <= totalSeats",
+                ReturnValues: "ALL_NEW"
+            })
+        );
+
+        return formatPackage(result.Attributes);
+    } catch (error) {
+        if (error.name === "ConditionalCheckFailedException") {
+            const existing = await getPackageByID(packageID);
+
+            if (!existing) return null;
+
+            throw new Error(
+                "Seats left must be between 0 and total seats"
+            );
+        }
+
+        throw error;
     }
-    pkg.seatsLeft = seatsLeft;
-    return pkg; 
 }
 
-module.exports= {
+module.exports = {
     getAllPackages,
     getPackageByID,
     createPackage,
     updatePackage,
-    updateSeats,
+    updateSeats
 };
