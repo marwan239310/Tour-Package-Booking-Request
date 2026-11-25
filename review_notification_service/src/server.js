@@ -4,6 +4,7 @@ const cors = require("cors");
 require("dotenv").config();
 const requestRoutes = require("./routes/requestRoutes");
 const notificationController = require("./controllers/notificationController");
+const secretsService = require("./services/secretsService");
 
 const app = express();
 
@@ -21,7 +22,13 @@ app.get("/", (req, res) => {
 
 app.use("/requests", requestRoutes);   // every /requests URL goes to the routes
 
-const PORT = process.env.PORT || 3003;
-app.listen(PORT, () => {
-  console.log(`The review and notification service is running on port ${PORT}`);
-});
+// Start: first load the Brevo key from Secrets Manager, then start listening
+async function start() {
+  await secretsService.loadSecrets();
+  const PORT = process.env.PORT || 3003;
+  app.listen(PORT, () => {
+    console.log(`The review and notification service is running on port ${PORT}`);
+  });
+}
+
+start();
