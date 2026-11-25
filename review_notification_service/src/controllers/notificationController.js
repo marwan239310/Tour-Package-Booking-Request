@@ -1,4 +1,4 @@
- // Receives the messages that SNS delivers to POST /internal/sns-notify
+// Receives the messages that SNS delivers to POST /internal/sns-notify
 // and turns each one into a real email for the customer (Brevo).
 const snsService = require("../services/snsService");
 const requestService = require("../services/requestService");
@@ -42,7 +42,14 @@ async function handleSnsMessage(req, res) {
       return res.status(400).send("Invalid message content");
     }
 
-    const request = requestService.getRequestByID(message.requestID);
+    // NEW: read the request from DynamoDB (await = wait for the database)
+    let request;
+    try {
+      request = await requestService.getRequestByID(message.requestID);
+    } catch (error) {
+      console.log("SNS: could not read the request:", error.message);
+      return res.status(500).send("Could not read the request");
+    }
     if (!request) {
       console.log(`SNS: request ${message.requestID} not found, no email sent`);
       return res.status(200).send("Request not found");

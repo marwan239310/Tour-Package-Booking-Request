@@ -2,7 +2,7 @@ const requestService = require("../services/requestService");
 const snsService = require("../services/snsService");
 
 // Function 1 - GET /requests?status=&packageID=&date=
-function listRequests(req, res) {
+async function listRequests(req, res) {
   const { status, packageID, date } = req.query;
 
   // Reject a status that does not exist
@@ -17,8 +17,13 @@ function listRequests(req, res) {
     return res.status(400).json({ message: "Date must be in the format YYYY-MM-DD" });
   }
 
-  const requests = requestService.getRequests({ status, packageID, date });
-  res.status(200).json(requests);
+  try {
+    const requests = await requestService.getRequests({ status, packageID, date });
+    res.status(200).json(requests);
+  } catch (error) {
+    console.log("Could not read requests:", error.message);
+    res.status(500).json({ message: "Could not load the booking requests" });
+  }
 }
 
 // Function 2 - PATCH /requests/:requestID/status
@@ -51,7 +56,7 @@ async function updateRequestStatus(req, res) {
   }
 
   try {
-    const updated = requestService.updateStatus(
+    const updated = await requestService.updateStatus(
       requestID,
       status,
       typeof reason === "string" ? reason.trim() : undefined,
@@ -72,17 +77,28 @@ async function updateRequestStatus(req, res) {
 
     res.status(200).json({ ...updated, notificationPublished });
   } catch (error) {
-    res.status(error.statusCode || 500).json({ message: error.message });
+    if (error.statusCode) {
+      return res.status(error.statusCode).json({ message: error.message });
+    }
+    console.log("Could not update the status:", error.message);
+    res.status(500).json({ message: "Could not update the booking request" });
   }
 }
 
 // GET /requests/:requestID/history
-function getRequestHistory(req, res) {
+async function getRequestHistory(req, res) {
   const { requestID } = req.params;
-  if (!requestService.getRequestByID(requestID)) {
-    return res.status(404).json({ message: "Booking request not found" });
+  try {
+    const request = await requestService.getRequestByID(requestID);
+    if (!request) {
+      return res.status(404).json({ message: "Booking request not found" });
+    }
+    const history = await requestService.getHistory(requestID);
+    res.status(200).json(history);
+  } catch (error) {
+    console.log("Could not read the history:", error.message);
+    res.status(500).json({ message: "Could not load the status history" });
   }
-  res.status(200).json(requestService.getHistory(requestID));
 }
 
 module.exports = {
