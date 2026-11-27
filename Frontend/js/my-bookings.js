@@ -163,7 +163,7 @@ async function changeTravelers(requestID, travelers) {
 async function cancelBooking(requestID) {
     if (!confirm(`Cancel request ${requestID}? This cannot be undone.`)) return;
     try {
-        await readJson(
+        const result = await readJson(
             await fetch(`${BOOKING_API_URL}/bookings/${encodeURIComponent(requestID)}/cancel`, {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
@@ -172,7 +172,12 @@ async function cancelBooking(requestID) {
             "Request could not be cancelled."
         );
         await loadMyBookings();
-        showMessage(`Request ${requestID} was cancelled. The seats were given back.`, "success");
+        showMessage(
+            result.seatsReleased === false
+                ? `Request ${requestID} was cancelled. The seats will be given back by our team.`
+                : `Request ${requestID} was cancelled. The seats were given back.`,
+            "success"
+        );
     } catch (error) {
         showMessage(error.message, "error");
     }

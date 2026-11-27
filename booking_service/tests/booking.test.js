@@ -53,18 +53,29 @@ require.cache[path.join(__dirname, "../src/config/dynamodb.js")] = {
 };
 
 // ---------- Fake package service ----------
+// Works like the package service's /reserve and /release endpoints (same checks, same status codes)
 const packages = {};
+let releaseBroken = false; // true = /release answers 500 (to test a cancel when the package service fails)
 const realFetch = global.fetch;
 global.fetch = async (url, options = {}) => {
   const u = String(url);
   if (!u.startsWith("http://package.test")) return realFetch(url, options);
-  const match = u.match(/\/packages\/([^/]+)(\/seats)?$/);
+  const match = u.match(/\/packages\/([^/]+)(?:\/(reserve|release))?$/);
   const pkg = packages[decodeURIComponent(match[1])];
-  if (!pkg) return new Response(JSON.stringify({ message: "not found" }), { status: 404 });
-  if (match[2]) {
-    const seatsLeft = JSON.parse(options.body).seatsLeft;
-    if (seatsLeft < 0 || seatsLeft > pkg.totalSeats) return new Response("{}", { status: 400 });
-    pkg.seatsLeft = seatsLeft;
+  const action = match[2];
+  if (!pkg) return new Response(JSON.stringify({ message: "Package not found" }), { status: 404 });
+  if (action) {
+    const travelers = JSON.parse(options.body).travelers;
+    if (!Number.isInteger(travelers) || travelers <= 0) return new Response("{}", { status: 400 });
+    if (action === "release" && releaseBroken) return new Response("{}", { status: 500 });
+    if (action === "reserve") {
+      if (pkg.seatsLeft < travelers) return new Response(JSON.stringify({ message: "Not enough seats available" }), { status: 409 });
+      pkg.seatsLeft -= travelers;
+    } else {
+      if (pkg.seatsLeft + travelers > pkg.totalSeats) return new Response("{}", { status: 409 });
+      pkg.seatsLeft += travelers;
+    }
+    return new Response(JSON.stringify({ message: "ok", package: pkg }), { status: 200 });
   }
   return new Response(JSON.stringify(pkg), { status: 200 });
 };
@@ -89,6 +100,7 @@ const EMAIL = "karim@example.com";
 const valid = (extra = {}) => ({ packageID: "PKG-1", customerName: "Karim Test", customerEmail: EMAIL, phone: "01012345678", travelers: 2, ...extra });
 
 beforeEach(() => {
+  releaseBroken = false;
   tables.BookingRequests.clear();
   tables.StatusHistory.length = 0;
   packages["PKG-1"] = { packageID: "PKG-1", title: "Luxor trip", price: 5000, totalSeats: 5, seatsLeft: 5, isPublished: true };
@@ -210,6 +222,22 @@ test("BK-15 broken JSON body -> 400; unknown route -> 404", async () => {
   const res = await realFetch(base + "/bookings", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{bad" });
   assert.strictEqual(res.status, 400);
   assert.strictEqual((await call("GET", "/nothing-here")).status, 404);
+});
+
+test("BK-16 cancel still works when the seats cannot be given back -> 200, seatsReleased false", async () => {
+  const created = (await call("POST", "/bookings", valid())).body;
+  releaseBroken = true;
+  const r = await call("PATCH", `/bookings/${created.requestID}/cancel`, { email: EMAIL });
+  assert.strictEqual(r.status, 200);
+  assert.strictEqual(r.body.status, "cancelled");
+  assert.strictEqual(r.body.seatsReleased, false);
+  assert.strictEqual(tables.BookingRequests.get(created.requestID).status, "cancelled");
+});
+
+test("BK-17 normal cancel says seatsReleased true", async () => {
+  const created = (await call("POST", "/bookings", valid())).body;
+  const r = await call("PATCH", `/bookings/${created.requestID}/cancel`, { email: EMAIL });
+  assert.strictEqual(r.body.seatsReleased, true);
 });
 
 test.after(() => server.close());

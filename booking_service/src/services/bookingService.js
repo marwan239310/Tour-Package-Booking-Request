@@ -55,8 +55,8 @@ async function createBooking(data) {
     throw httpError(`Only ${pkg.seatsLeft} seats are left for this package`, 409);
   }
 
-  // Reserve the seats in the package service
-  await packageClient.changeSeats(pkg.packageID, -travelers);
+  // Reserve the seats in the package service (409 if someone else just took them)
+  await packageClient.reserveSeats(pkg.packageID, travelers);
 
   const now = new Date().toISOString();
   const request = {
@@ -86,7 +86,7 @@ async function createBooking(data) {
     await addHistory(request.requestID, null, "pending", "Request submitted");
   } catch (error) {
     // Saving failed: give the seats back so they are not lost
-    await packageClient.changeSeats(pkg.packageID, travelers).catch(() => {});
+    await packageClient.releaseSeats(pkg.packageID, travelers).catch(() => {});
     throw error;
   }
   return request;
@@ -142,6 +142,8 @@ async function getMyBooking(requestID, email) {
 
 // Function 3: cancel my request
 // Business rules: only the owner can cancel, only in a cancellable status, and the seats go back to the package.
+// The cancel is saved first. If giving the seats back fails (package service down), the cancel still counts:
+// the answer says seatsReleased: false and the problem is logged, instead of showing the customer an error.
 async function cancelBooking(requestID, email) {
   const request = await getMyBooking(requestID, email);
   if (!request) throw httpError("Booking request not found", 404);
@@ -173,9 +175,16 @@ async function cancelBooking(requestID, email) {
   }
 
   await addHistory(requestID, request.status, "cancelled", "Cancelled by the customer");
+
   // Give the reserved seats back
-  await packageClient.changeSeats(request.packageID, Number(request.travelers));
-  return updated;
+  let seatsReleased = false;
+  try {
+    await packageClient.releaseSeats(request.packageID, Number(request.travelers));
+    seatsReleased = true;
+  } catch (error) {
+    console.log(`Seats not released for ${requestID} (${request.packageID}):`, error.message);
+  }
+  return { ...updated, seatsReleased };
 }
 
 // Extra function: change the number of travelers while the request is still pending
@@ -190,8 +199,9 @@ async function changeTravelers(requestID, email, newTravelers) {
   const difference = travelers - Number(request.travelers);
   if (difference === 0) return request;
 
-  // Take extra seats (difference > 0) or give seats back (difference < 0). Fails with 409 if not enough seats.
-  await packageClient.changeSeats(request.packageID, -difference);
+  // Take extra seats (difference > 0, 409 if not enough) or give seats back (difference < 0)
+  if (difference > 0) await packageClient.reserveSeats(request.packageID, difference);
+  else await packageClient.releaseSeats(request.packageID, -difference);
 
   const pricePerPerson = Number(request.totalPrice) / Number(request.travelers);
   try {
@@ -214,7 +224,10 @@ async function changeTravelers(requestID, email, newTravelers) {
     return result.Attributes;
   } catch (error) {
     // Undo the seat change
-    await packageClient.changeSeats(request.packageID, difference).catch(() => {});
+    const undo = difference > 0
+      ? packageClient.releaseSeats(request.packageID, difference)
+      : packageClient.reserveSeats(request.packageID, -difference);
+    await undo.catch(() => {});
     if (error.name === "ConditionalCheckFailedException") {
       throw httpError("This request was just changed by the staff. Please refresh and try again.", 409);
     }
