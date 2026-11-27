@@ -20,10 +20,10 @@ app.get("/", (req, res) => {
 app.get("/health", async (req, res) => {
     try {
         await dynamodb.send(
-            new DescribeTableCommand({
-                TableName: "Packages"
-            })
-        );
+    new DescribeTableCommand({
+        TableName: process.env.DYNAMODB_TABLE || "Packages"
+    })
+);
 
         res.status(200).json({
             status: "OK",

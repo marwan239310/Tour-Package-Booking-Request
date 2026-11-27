@@ -4,13 +4,15 @@
   "description": "Tour Package Booking Package Service",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "zip": "node scripts/zip-lambda.js"
   },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.1177.0",
     "@aws-sdk/lib-dynamodb": "^3.1177.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
-    "express": "^4.21.2"
+    "express": "^4.21.2",
+    "serverless-http": "^4.0.0"
   }
 }

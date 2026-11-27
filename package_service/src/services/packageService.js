@@ -10,7 +10,7 @@ const {
 
 const dynamodb = require("../config/dynamodb");
 
-const TABLE_NAME = "Packages";
+const TABLE_NAME = process.env.DYNAMODB_TABLE || "Packages";
 
 
 function formatPackage(item) {
