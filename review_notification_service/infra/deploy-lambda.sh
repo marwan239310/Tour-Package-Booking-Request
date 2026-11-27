@@ -13,9 +13,13 @@ ROLE=review-notification-service-role
 API_NAME=review-notification-api
 TOPIC_ARN=arn:aws:sns:$REGION:$ACCOUNT:booking-status-topic
 
+# Where the Lambda can reach the package service (Marwan), to give seats back on reject/cancel.
+# Default: the package service running on this PC. Later:  PACKAGE_SERVICE_URL=<Marwan's API URL> bash infra/deploy-lambda.sh
+PACKAGE_URL=${PACKAGE_SERVICE_URL:-http://host.docker.internal:3001}
+
 # Testing only: if .env has TEST_EMAIL_OVERRIDE, all emails go to that address
 TEST_EMAIL=$(grep -E "^TEST_EMAIL_OVERRIDE=" .env 2>/dev/null | head -1 | cut -d= -f2- | tr -d '\r')
-ENV_VARS="Variables={AWS_ENDPOINT=http://host.docker.internal:4566,SNS_TOPIC_ARN=$TOPIC_ARN,SECRET_ID=tour-booking/brevo,NODE_ENV=production"
+ENV_VARS="Variables={AWS_ENDPOINT=http://host.docker.internal:4566,SNS_TOPIC_ARN=$TOPIC_ARN,SECRET_ID=tour-booking/brevo,PACKAGE_SERVICE_URL=$PACKAGE_URL,NODE_ENV=production"
 [ -n "$TEST_EMAIL" ] && ENV_VARS="$ENV_VARS,TEST_EMAIL_OVERRIDE=$TEST_EMAIL"
 ENV_VARS="$ENV_VARS}"
 

@@ -1,5 +1,9 @@
 const requestService = require("../services/requestService");
 const snsService = require("../services/snsService");
+const packageClient = require("../services/packageClient");
+
+// When staff move a request to one of these, its reserved seats go back to the package
+const RELEASE_SEATS_STATUSES = ["rejected", "cancelled"];
 
 // Function 1 - GET /requests?status=&packageID=&date=
 async function listRequests(req, res) {
@@ -66,6 +70,19 @@ async function updateRequestStatus(req, res) {
       return res.status(404).json({ message: "Booking request not found" });
     }
 
+    // Seats: the customer's seats were reserved when the request was submitted (Karim's service).
+    // If staff reject or cancel it, give the seats back to the package (Marwan's service).
+    // If that fails, the status change is still saved and the answer shows seatsReleased: false.
+    let seatsReleased = null;
+    if (RELEASE_SEATS_STATUSES.includes(updated.status)) {
+      try {
+        seatsReleased = await packageClient.releaseSeats(updated.packageID, updated.travelers);
+      } catch (seatsError) {
+        console.log("Seats not released:", seatsError.message);
+        seatsReleased = false;
+      }
+    }
+
     // Function 3: announce the change on SNS. If it fails, the status change is still saved.
     let notificationPublished = false;
     try {
@@ -75,7 +92,7 @@ async function updateRequestStatus(req, res) {
       console.log("SNS publish failed:", snsError.message);
     }
 
-    res.status(200).json({ ...updated, notificationPublished });
+    res.status(200).json({ ...updated, seatsReleased, notificationPublished });
   } catch (error) {
     if (error.statusCode) {
       return res.status(error.statusCode).json({ message: error.message });

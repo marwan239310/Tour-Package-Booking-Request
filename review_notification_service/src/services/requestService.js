@@ -144,12 +144,13 @@ async function updateStatus(requestID, newStatus, reason, note) {
         fromStatus: oldStatus,
         toStatus: newStatus,
         reason: reason || null,
-        note: note || null
+        note: note || null,
+        changedBy: "staff"
       }
     })
   );
 
-    // CloudWatch Logs: one clear AUDIT line for every status change (who / what / when).
+  // CloudWatch Logs: one clear AUDIT line for every status change (who / what / when).
   // In Lambda, everything printed with console.log goes to CloudWatch Logs automatically.
   console.log(JSON.stringify({
     type: "AUDIT",
@@ -159,9 +160,10 @@ async function updateStatus(requestID, newStatus, reason, note) {
     toStatus: newStatus,
     reason: reason || null,
     note: note || null,
+    changedBy: "staff",
     changedAt: values[":now"]
   }));
-  
+
   return updated;
 }
 
