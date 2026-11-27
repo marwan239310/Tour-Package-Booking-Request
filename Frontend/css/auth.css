@@ -1,0 +1,48 @@
+/* Login page + the "email (role) | Sign out" bar in the header. Used by every page that has login. */
+.top-nav {
+    margin-top: 14px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 18px;
+    flex-wrap: wrap;
+}
+.top-nav a {
+    color: #d6e6f2;
+    text-decoration: none;
+    font-weight: bold;
+}
+.top-nav a.active,
+.top-nav a:hover {
+    color: white;
+    text-decoration: underline;
+}
+.user-info {
+    color: #d6e6f2;
+    font-size: 14px;
+}
+.link-button {
+    background: none;
+    border: 1px solid #d6e6f2;
+    color: white;
+    margin-top: 0;
+    padding: 4px 10px;
+    font-size: 14px;
+    border-radius: 4px;
+}
+.link-button:hover { background-color: #0e344f; }
+
+/* The login box */
+.login-box {
+    max-width: 440px;
+    margin: 0 auto;
+}
+.login-box #message { margin: 12px 0 0; }
+#message.success { color: #1b7a3a; }
+#message.error { color: #b3261e; }
+.demo-accounts {
+    margin-top: 18px;
+    font-size: 14px;
+    color: #333;
+}
+button:disabled { opacity: 0.6; cursor: wait; }
