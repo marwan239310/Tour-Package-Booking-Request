@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Deploys the review & notification service to Floci in one command (safe to run again):
-#   IAM role -> Lambda function -> API Gateway (7 routes) -> permission -> SNS subscription
+#   IAM role -> Lambda function -> API Gateway (8 routes) -> permission -> SNS subscription
 # Before the first run:  bash infra/setup-aws.sh   and   bash infra/store-secret.sh
 # Run from the service folder:  bash infra/deploy-lambda.sh
 export AWS_PROFILE=floci AWS_PAGER="" MSYS_NO_PATHCONV=1
@@ -48,20 +48,24 @@ echo "3/5 API Gateway: $API_NAME"
 API_ID=$(aws apigatewayv2 get-apis --query "Items[?Name=='$API_NAME'].ApiId | [0]" --output text)
 if [ -z "$API_ID" ] || [ "$API_ID" = "None" ]; then
   API_ID=$(aws apigatewayv2 create-api --name $API_NAME --protocol-type HTTP --query ApiId --output text)
-  INTEGRATION_ID=$(aws apigatewayv2 create-integration --api-id $API_ID \
+  aws apigatewayv2 create-integration --api-id $API_ID \
     --integration-type AWS_PROXY --payload-format-version 2.0 \
-    --integration-uri arn:aws:lambda:$REGION:$ACCOUNT:function:$FN \
-    --query IntegrationId --output text)
-  for ROUTE in "GET /" "GET /requests" "PATCH /requests/{requestID}/status" \
-               "GET /requests/{requestID}/history" "POST /internal/sns-notify" \
-               "OPTIONS /requests" "OPTIONS /requests/{requestID}/status"; do
-    aws apigatewayv2 create-route --api-id $API_ID --route-key "$ROUTE" \
-      --target integrations/$INTEGRATION_ID > /dev/null
-  done
+    --integration-uri arn:aws:lambda:$REGION:$ACCOUNT:function:$FN > /dev/null
   aws apigatewayv2 create-stage --api-id $API_ID --stage-name '$default' --auto-deploy > /dev/null
 else
-  echo "   (already exists)"
+  echo "   (API already exists)"
 fi
+INTEGRATION_ID=$(aws apigatewayv2 get-integrations --api-id $API_ID --query "Items[0].IntegrationId" --output text)
+EXISTING_ROUTES=$(aws apigatewayv2 get-routes --api-id $API_ID --query "Items[].RouteKey" --output text)
+# Add every route that is missing (so new routes are added on the next run)
+for ROUTE in "GET /" "GET /requests" "GET /requests/count" "PATCH /requests/{requestID}/status" \
+             "GET /requests/{requestID}/history" "POST /internal/sns-notify" \
+             "OPTIONS /requests" "OPTIONS /requests/{requestID}/status"; do
+  if ! printf '%s\n' "$EXISTING_ROUTES" | tr -d '\r' | tr '\t' '\n' | grep -qxF "$ROUTE"; then
+    aws apigatewayv2 create-route --api-id $API_ID --route-key "$ROUTE" \
+      --target integrations/$INTEGRATION_ID > /dev/null && echo "   added route: $ROUTE"
+  fi
+done
 API_URL=http://$API_ID.execute-api.localhost.floci.io:4566
 
 echo "4/5 Permission: only this API may call the Lambda"

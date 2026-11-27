@@ -179,10 +179,22 @@ async function getHistory(requestID) {
   return result.Items || [];
 }
 
+// Extra: how many requests are in each status (for the staff dashboard)
+async function countByStatus() {
+  const requests = await getRequests();
+  const byStatus = {};
+  for (const status of STATUSES) byStatus[status] = 0;   // start every status at 0
+  for (const request of requests) {
+    if (byStatus[request.status] !== undefined) byStatus[request.status] += 1;
+  }
+  return { total: requests.length, byStatus };
+}
+
 module.exports = {
   STATUSES,
   getRequests,
   getRequestByID,
   updateStatus,
-  getHistory
+  getHistory,
+  countByStatus
 };

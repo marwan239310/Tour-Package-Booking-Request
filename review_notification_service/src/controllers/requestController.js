@@ -101,8 +101,20 @@ async function getRequestHistory(req, res) {
   }
 }
 
+// Extra - GET /requests/count : number of requests in each status
+async function countRequests(req, res) {
+  try {
+    const counts = await requestService.countByStatus();
+    res.status(200).json(counts);
+  } catch (error) {
+    console.log("Could not count requests:", error.message);
+    res.status(500).json({ message: "Could not count the booking requests" });
+  }
+}
+
 module.exports = {
   listRequests,
   updateRequestStatus,
-  getRequestHistory
+  getRequestHistory,
+  countRequests
 };
