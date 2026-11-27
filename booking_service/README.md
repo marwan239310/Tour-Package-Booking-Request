@@ -105,7 +105,7 @@ npm start          # http://localhost:3002
 ## Test
 
 ```
-npm test           # 15 automated tests (DynamoDB and the package service are faked)
+npm test           # 17 automated tests (DynamoDB and the package service are faked)
 ```
 
 Manual test on the deployed API:
