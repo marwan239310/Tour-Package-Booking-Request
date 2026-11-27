@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>My Booking Requests</title>
+        <link rel="stylesheet" href="css/style.css">
+        <link rel="stylesheet" href="css/booking.css">
+    </head>
+    <body>
+        <header>
+            <h1>My Booking Requests</h1>
+            <p>Check the status of your requests, change travelers or cancel</p>
+            <nav class="top-nav">
+                <a href="index.html">Packages</a>
+                <a href="booking.html">Book a tour</a>
+                <a href="my-bookings.html" class="active">My requests</a>
+            </nav>
+        </header>
+        <main>
+            <section>
+                <h2>Find My Requests</h2>
+                <form id="search-form" novalidate>
+                    <label for="email">Email used for booking</label>
+                    <input type="email" id="email" required>
+
+                    <label for="status-filter">Status</label>
+                    <select id="status-filter">
+                        <option value="">All statuses</option>
+                        <option value="pending">Pending</option>
+                        <option value="under_review">Under review</option>
+                        <option value="confirmed">Confirmed</option>
+                        <option value="awaiting_payment">Awaiting payment</option>
+                        <option value="accepted">Accepted</option>
+                        <option value="rejected">Rejected</option>
+                        <option value="cancelled">Cancelled</option>
+                    </select>
+
+                    <button type="submit">Show My Requests</button>
+                </form>
+            </section>
+            <section>
+                <h2>My Requests</h2>
+                <p id="message" role="status"></p>
+                <div id="bookings-list" class="bookings-list"></div>
+            </section>
+        </main>
+        <script src="js/config.js" defer></script>
+        <script src="js/my-bookings.js" defer></script>
+    </body>
+</html>
