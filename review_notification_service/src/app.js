@@ -3,6 +3,7 @@ const express = require("express");
 const cors = require("cors");
 const requestRoutes = require("./routes/requestRoutes");
 const notificationController = require("./controllers/notificationController");
+const { requireStaff } = require("./middleware/auth");
 
 const app = express();
 
@@ -19,6 +20,7 @@ app.get("/", (req, res) => {
   res.json({ message: "The review and notification service is running", runtime });
 });
 
-app.use("/requests", requestRoutes);   // every /requests URL goes to the routes
+// Every /requests URL is for staff only: the login check runs first, then the routes
+app.use("/requests", requireStaff, requestRoutes);
 
 module.exports = app;

@@ -1,4 +1,8 @@
 // Staff page: dashboard counts, filter requests, change status (reason / note), see history
+// Staff only: requireLogin("staff") sends everyone else to the login page (auth.js).
+// Every call to the API sends the login token; the API checks it again (401 / 403).
+const session = requireLogin("staff");
+
 const countsBox = document.getElementById("counts");
 const filterForm = document.getElementById("filter-form");
 const statusFilter = document.getElementById("status-filter");
@@ -52,6 +56,11 @@ function line(label, value) {
 
 // Read the JSON answer; if the service answered with an error, throw its message
 async function readJson(response, fallback) {
+    // 401: the login expired or is not valid any more -> sign in again
+    if (response.status === 401) {
+        signOut();
+        throw new Error("Please sign in again.");
+    }
     const result = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(result.message || fallback);
     return result;
@@ -61,7 +70,7 @@ async function readJson(response, fallback) {
 async function loadCounts() {
     try {
         const counts = await readJson(
-            await fetch(`${REVIEW_API_URL}/requests/count`),
+            await fetch(`${REVIEW_API_URL}/requests/count`, { headers: authHeaders() }),
             "The counts could not load."
         );
         countsBox.innerHTML = "";
@@ -97,7 +106,7 @@ async function loadRequests() {
         if (dateFilter.value) query.set("date", dateFilter.value);
 
         const requests = await readJson(
-            await fetch(`${REVIEW_API_URL}/requests?${query}`),
+            await fetch(`${REVIEW_API_URL}/requests?${query}`, { headers: authHeaders() }),
             "The requests could not load."
         );
         requestsList.innerHTML = "";
@@ -218,7 +227,7 @@ async function updateStatus(requestID, status, reason, note, button) {
         const result = await readJson(
             await fetch(`${REVIEW_API_URL}/requests/${encodeURIComponent(requestID)}/status`, {
                 method: "PATCH",
-                headers: { "Content-Type": "application/json" },
+                headers: { ...authHeaders(), "Content-Type": "application/json" },
                 body: JSON.stringify(body)
             }),
             "The status could not be changed."
@@ -248,7 +257,7 @@ async function toggleHistory(requestID, box, button) {
     }
     try {
         const history = await readJson(
-            await fetch(`${REVIEW_API_URL}/requests/${encodeURIComponent(requestID)}/history`),
+            await fetch(`${REVIEW_API_URL}/requests/${encodeURIComponent(requestID)}/history`, { headers: authHeaders() }),
             "The history could not load."
         );
         box.innerHTML = "";
@@ -286,4 +295,8 @@ clearButton.addEventListener("click", () => {
     loadRequests();
 });
 
-loadAll();
+// Only load the data for signed-in staff
+if (session) {
+    showUserBar();
+    loadAll();
+}

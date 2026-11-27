@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Deploys the review & notification service to Floci in one command (safe to run again):
-#   IAM role -> Lambda function -> API Gateway (8 routes) -> permission -> SNS subscription
+#   IAM role -> Lambda function -> API Gateway (10 routes) -> permission -> SNS subscription
 # Before the first run:  bash infra/setup-aws.sh   and   bash infra/store-secret.sh
+#   and the team login (from the project folder):  bash infra/cognito/setup-cognito.sh
 # Run from the service folder:  bash infra/deploy-lambda.sh
 export AWS_PROFILE=floci AWS_PAGER="" MSYS_NO_PATHCONV=1
 cd "$(dirname "$0")/.." || exit 1
@@ -17,9 +18,22 @@ TOPIC_ARN=arn:aws:sns:$REGION:$ACCOUNT:booking-status-topic
 # Default: the package service running on this PC. Later:  PACKAGE_SERVICE_URL=<Marwan's API URL> bash infra/deploy-lambda.sh
 PACKAGE_URL=${PACKAGE_SERVICE_URL:-http://host.docker.internal:3001}
 
+# Login (Cognito, made by infra/cognito/setup-cognito.sh): the Lambda checks staff tokens with these
+POOL_ID=$(aws cognito-idp list-user-pools --max-results 60 \
+  --query "UserPools[?Name=='tour-booking-users'].Id | [0]" --output text)
+CLIENT_ID=$(aws cognito-idp list-user-pool-clients --user-pool-id "$POOL_ID" --max-results 60 \
+  --query "UserPoolClients[?ClientName=='tour-booking-web'].ClientId | [0]" --output text 2>/dev/null)
+if [ -z "$POOL_ID" ] || [ "$POOL_ID" = "None" ] || [ -z "$CLIENT_ID" ] || [ "$CLIENT_ID" = "None" ]; then
+  echo "The login (Cognito) is not set up yet. Run first, from the project folder:"
+  echo "  STAFF_PASSWORD='...' CUSTOMER_PASSWORD='...' bash infra/cognito/setup-cognito.sh"
+  exit 1
+fi
+# The issuer is written in the tokens with localhost; the Lambda downloads the keys through host.docker.internal
+COGNITO_VARS="COGNITO_ISSUER=http://localhost:4566/$POOL_ID,COGNITO_CLIENT_ID=$CLIENT_ID,COGNITO_JWKS_URL=http://host.docker.internal:4566/$POOL_ID/.well-known/jwks.json"
+
 # Testing only: if .env has TEST_EMAIL_OVERRIDE, all emails go to that address
 TEST_EMAIL=$(grep -E "^TEST_EMAIL_OVERRIDE=" .env 2>/dev/null | head -1 | cut -d= -f2- | tr -d '\r')
-ENV_VARS="Variables={AWS_ENDPOINT=http://host.docker.internal:4566,SNS_TOPIC_ARN=$TOPIC_ARN,SECRET_ID=tour-booking/brevo,PACKAGE_SERVICE_URL=$PACKAGE_URL,NODE_ENV=production"
+ENV_VARS="Variables={AWS_ENDPOINT=http://host.docker.internal:4566,SNS_TOPIC_ARN=$TOPIC_ARN,SECRET_ID=tour-booking/brevo,PACKAGE_SERVICE_URL=$PACKAGE_URL,$COGNITO_VARS,NODE_ENV=production"
 [ -n "$TEST_EMAIL" ] && ENV_VARS="$ENV_VARS,TEST_EMAIL_OVERRIDE=$TEST_EMAIL"
 ENV_VARS="$ENV_VARS}"
 
@@ -35,15 +49,15 @@ echo "2/5 Lambda function: $FN (this can take a few minutes)"
 npm run zip --silent || exit 1
 if aws lambda get-function --function-name $FN > /dev/null 2>&1; then
   aws lambda update-function-code --function-name $FN --zip-file fileb://lambda.zip \
-    --cli-read-timeout 300 > /dev/null
+    --cli-read-timeout 0 > /dev/null
   aws lambda wait function-updated-v2 --function-name $FN
   aws lambda update-function-configuration --function-name $FN --handler src/lambda.handler \
-    --timeout 15 --environment "$ENV_VARS" --cli-read-timeout 300 > /dev/null
+    --timeout 15 --environment "$ENV_VARS" --cli-read-timeout 0 > /dev/null
   aws lambda wait function-updated-v2 --function-name $FN
 else
   aws lambda create-function --function-name $FN --runtime nodejs24.x --handler src/lambda.handler \
     --role arn:aws:iam::$ACCOUNT:role/$ROLE --zip-file fileb://lambda.zip --timeout 15 \
-    --environment "$ENV_VARS" --cli-read-timeout 300 > /dev/null
+    --environment "$ENV_VARS" --cli-read-timeout 0 > /dev/null
   aws lambda wait function-active-v2 --function-name $FN
 fi
 aws lambda get-function --function-name $FN --query "Configuration.State" --output text
@@ -64,7 +78,8 @@ EXISTING_ROUTES=$(aws apigatewayv2 get-routes --api-id $API_ID --query "Items[].
 # Add every route that is missing (so new routes are added on the next run)
 for ROUTE in "GET /" "GET /requests" "GET /requests/count" "PATCH /requests/{requestID}/status" \
              "GET /requests/{requestID}/history" "POST /internal/sns-notify" \
-             "OPTIONS /requests" "OPTIONS /requests/{requestID}/status"; do
+             "OPTIONS /requests" "OPTIONS /requests/count" "OPTIONS /requests/{requestID}/status" \
+             "OPTIONS /requests/{requestID}/history"; do
   if ! printf '%s\n' "$EXISTING_ROUTES" | tr -d '\r' | tr '\t' '\n' | grep -qxF "$ROUTE"; then
     aws apigatewayv2 create-route --api-id $API_ID --route-key "$ROUTE" \
       --target integrations/$INTEGRATION_ID > /dev/null && echo "   added route: $ROUTE"
