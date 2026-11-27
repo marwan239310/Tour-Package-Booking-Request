@@ -1,5 +1,6 @@
 
 const { randomUUID } = require("crypto");
+
 const {
     ScanCommand,
     GetCommand,
@@ -11,6 +12,7 @@ const dynamodb = require("../config/dynamodb");
 
 const TABLE_NAME = "Packages";
 
+
 function formatPackage(item) {
     if (!item) return null;
 
@@ -18,50 +20,62 @@ function formatPackage(item) {
         packageID: item.packageId,
         title: item.title,
         destination: item.destination,
-        itinerary: item.itinerary,
+        itinerary: item.itinerary || [],
         startDate: item.startDate,
         endDate: item.endDate,
-        price: item.price,
-        totalSeats: item.totalSeats,
-        seatsLeft: item.seatsLeft,
+        price: Number(item.price),
+        totalSeats: Number(item.totalSeats),
+        seatsLeft: Number(item.seatsLeft),
         isPublished: item.isPublished
     };
 }
 
+
 async function getAllPackages(filters = {}) {
-    let items = [];
-    let lastKey;
+    const result = await dynamodb.send(
+        new ScanCommand({
+            TableName: TABLE_NAME
+        })
+    );
 
-    do {
-        const result = await dynamodb.send(
-            new ScanCommand({
-                TableName: TABLE_NAME,
-                ExclusiveStartKey: lastKey
-            })
+    let packages = (result.Items || []).map(formatPackage);
+
+    if (filters.isPublished !== undefined) {
+        packages = packages.filter(
+            p => p.isPublished === filters.isPublished
         );
+    } else {
+        packages = packages.filter(p => p.isPublished === true);
+    }
 
-        items = items.concat(result.Items || []);
-        lastKey = result.LastEvaluatedKey;
-    } while (lastKey);
+    if (filters.destination) {
+        packages = packages.filter(
+            p => p.destination &&
+                p.destination.toLowerCase() === filters.destination.toLowerCase()
+        );
+    }
 
-    return items
-        .filter(pkg => pkg.isPublished === true)
-        .filter(pkg =>
-            !filters.destination ||
-            pkg.destination.toLowerCase().includes(
-                filters.destination.toLowerCase()
-            )
-        )
-        .filter(pkg =>
-            !filters.date || pkg.startDate === filters.date
-        )
-        .filter(pkg =>
-            filters.maxPrice === undefined ||
-            filters.maxPrice === "" ||
-            Number(pkg.price) <= Number(filters.maxPrice)
-        )
-        .map(formatPackage);
+    if (filters.startDate) {
+        packages = packages.filter(
+            p => p.startDate >= filters.startDate
+        );
+    }
+
+    if (filters.endDate) {
+        packages = packages.filter(
+            p => p.endDate <= filters.endDate
+        );
+    }
+
+    if (filters.maxPrice !== undefined) {
+        packages = packages.filter(
+            p => p.price <= Number(filters.maxPrice)
+        );
+    }
+
+    return packages;
 }
+
 
 async function getPackageByID(packageID) {
     const result = await dynamodb.send(
@@ -76,8 +90,9 @@ async function getPackageByID(packageID) {
     return formatPackage(result.Item);
 }
 
+
 async function createPackage(data) {
-    const newPackage = {
+    const packageData = {
         packageId: randomUUID(),
         title: data.title,
         destination: data.destination,
@@ -87,18 +102,18 @@ async function createPackage(data) {
         price: Number(data.price),
         totalSeats: Number(data.totalSeats),
         seatsLeft: Number(data.totalSeats),
-        isPublished: false
+        isPublished: data.isPublished === true
     };
 
     await dynamodb.send(
         new PutCommand({
             TableName: TABLE_NAME,
-            Item: newPackage,
+            Item: packageData,
             ConditionExpression: "attribute_not_exists(packageId)"
         })
     );
 
-    return formatPackage(newPackage);
+    return formatPackage(packageData);
 }
 
 async function updatePackage(packageID, data) {
@@ -110,31 +125,37 @@ async function updatePackage(packageID, data) {
         "endDate",
         "price",
         "totalSeats",
+        "seatsLeft",
         "isPublished"
     ];
 
-    const names = {};
-    const values = {};
-    const updates = [];
+    const updateFields = Object.keys(data).filter(
+        field => allowedFields.includes(field)
+    );
 
-    for (const field of allowedFields) {
-        if (data[field] !== undefined) {
-            names[`#${field}`] = field;
+    if (updateFields.length === 0) {
+        throw new Error("No valid fields provided for update");
+    }
 
-            let value = data[field];
+    const expressionNames = {};
+    const expressionValues = {};
+    const updateExpressions = [];
 
-            if (field === "price" || field === "totalSeats") {
-                value = Number(value);
-            }
+    updateFields.forEach((field, index) => {
+        const nameKey = `#field${index}`;
+        const valueKey = `:value${index}`;
 
-            values[`:${field}`] = value;
-            updates.push(`#${field} = :${field}`);
+        expressionNames[nameKey] = field;
+
+        let value = data[field];
+
+        if (field === "price" || field === "totalSeats" || field === "seatsLeft") {
+            value = Number(value);
         }
-    }
 
-    if (updates.length === 0) {
-        return getPackageByID(packageID);
-    }
+        expressionValues[valueKey] = value;
+        updateExpressions.push(`${nameKey} = ${valueKey}`);
+    });
 
     try {
         const result = await dynamodb.send(
@@ -143,9 +164,9 @@ async function updatePackage(packageID, data) {
                 Key: {
                     packageId: packageID
                 },
-                UpdateExpression: `SET ${updates.join(", ")}`,
-                ExpressionAttributeNames: names,
-                ExpressionAttributeValues: values,
+                UpdateExpression: `SET ${updateExpressions.join(", ")}`,
+                ExpressionAttributeNames: expressionNames,
+                ExpressionAttributeValues: expressionValues,
                 ConditionExpression: "attribute_exists(packageId)",
                 ReturnValues: "ALL_NEW"
             })
@@ -185,7 +206,9 @@ async function updateSeats(packageID, seatsLeft) {
         if (error.name === "ConditionalCheckFailedException") {
             const existing = await getPackageByID(packageID);
 
-            if (!existing) return null;
+            if (!existing) {
+                return null;
+            }
 
             throw new Error(
                 "Seats left must be between 0 and total seats"
@@ -196,10 +219,95 @@ async function updateSeats(packageID, seatsLeft) {
     }
 }
 
+
+async function reserveSeats(packageID, travelers) {
+    try {
+        const result = await dynamodb.send(
+            new UpdateCommand({
+                TableName: TABLE_NAME,
+                Key: {
+                    packageId: packageID
+                },
+                UpdateExpression:
+                    "SET seatsLeft = seatsLeft - :travelers",
+                ExpressionAttributeValues: {
+                    ":travelers": travelers
+                },
+                ConditionExpression:
+                    "attribute_exists(packageId) AND attribute_exists(seatsLeft) AND seatsLeft >= :travelers",
+                ReturnValues: "ALL_NEW"
+            })
+        );
+
+        return formatPackage(result.Attributes);
+    } catch (error) {
+        if (error.name === "ConditionalCheckFailedException") {
+            const existing = await getPackageByID(packageID);
+
+            if (!existing) {
+                return null;
+            }
+
+            const conflict = new Error("Not enough seats available");
+            conflict.code = "INSUFFICIENT_SEATS";
+            throw conflict;
+        }
+
+        throw error;
+    }
+}
+
+
+async function releaseSeats(packageID, travelers) {
+    // Get the package to calculate the maximum allowed seats
+    const existing = await getPackageByID(packageID);
+
+    if (!existing) {
+        return null;
+    }
+
+    const maxSeats = Number(existing.totalSeats) - travelers;
+
+    try {
+        const result = await dynamodb.send(
+            new UpdateCommand({
+                TableName: TABLE_NAME,
+                Key: {
+                    packageId: packageID
+                },
+                UpdateExpression:
+                    "SET seatsLeft = seatsLeft + :travelers",
+                ExpressionAttributeValues: {
+                    ":travelers": travelers,
+                    ":maxSeats": maxSeats
+                },
+                ConditionExpression:
+                    "attribute_exists(packageId) AND attribute_exists(seatsLeft) AND seatsLeft <= :maxSeats",
+                ReturnValues: "ALL_NEW"
+            })
+        );
+
+        return formatPackage(result.Attributes);
+    } catch (error) {
+        if (error.name === "ConditionalCheckFailedException") {
+            const conflict = new Error(
+                "Releasing these seats would exceed total capacity"
+            );
+            conflict.code = "SEAT_CAPACITY_EXCEEDED";
+            throw conflict;
+        }
+
+        throw error;
+    }
+}
+
+
 module.exports = {
     getAllPackages,
     getPackageByID,
     createPackage,
     updatePackage,
-    updateSeats
+    updateSeats,
+    reserveSeats,
+    releaseSeats
 };

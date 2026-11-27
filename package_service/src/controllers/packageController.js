@@ -1,3 +1,4 @@
+
 const packageService = require("../services/packageService");
 const currencyService = require("../services/currencyService");
 
@@ -87,6 +88,12 @@ async function updateSeats(req, res) {
     const seatsLeft = Number(req.body.seatsLeft);
 
     try {
+        if (!Number.isInteger(seatsLeft) || seatsLeft < 0) {
+            return res.status(400).json({
+                message: "seatsLeft must be a non-negative integer"
+            });
+        }
+
         const updatedPackage = await packageService.updateSeats(
             req.params.packageID,
             seatsLeft
@@ -100,6 +107,86 @@ async function updateSeats(req, res) {
 
     } catch (error) {
         res.status(400).json({ message: error.message });
+    }
+}
+
+// Reserve seats for a booking request
+async function reserveSeats(req, res) {
+    const travelers = Number(req.body.travelers);
+
+    if (!Number.isInteger(travelers) || travelers <= 0) {
+        return res.status(400).json({
+            message: "travelers must be a positive integer"
+        });
+    }
+
+    try {
+        const updatedPackage = await packageService.reserveSeats(
+            req.params.packageID,
+            travelers
+        );
+
+        if (!updatedPackage) {
+            return res.status(404).json({
+                message: "Package not found"
+            });
+        }
+
+        return res.status(200).json({
+            message: "Seats reserved successfully",
+            package: updatedPackage
+        });
+
+    } catch (error) {
+        if (error.code === "INSUFFICIENT_SEATS") {
+            return res.status(409).json({
+                message: error.message
+            });
+        }
+
+        return res.status(500).json({
+            message: error.message
+        });
+    }
+}
+
+// Release seats when a booking is cancelled
+async function releaseSeats(req, res) {
+    const travelers = Number(req.body.travelers);
+
+    if (!Number.isInteger(travelers) || travelers <= 0) {
+        return res.status(400).json({
+            message: "travelers must be a positive integer"
+        });
+    }
+
+    try {
+        const updatedPackage = await packageService.releaseSeats(
+            req.params.packageID,
+            travelers
+        );
+
+        if (!updatedPackage) {
+            return res.status(404).json({
+                message: "Package not found"
+            });
+        }
+
+        return res.status(200).json({
+            message: "Seats released successfully",
+            package: updatedPackage
+        });
+
+    } catch (error) {
+        if (error.code === "SEAT_CAPACITY_EXCEEDED") {
+            return res.status(409).json({
+                message: error.message
+            });
+        }
+
+        return res.status(500).json({
+            message: error.message
+        });
     }
 }
 
@@ -143,5 +230,7 @@ module.exports = {
     createPackage,
     updatePackage,
     updateSeats,
+    reserveSeats,
+    releaseSeats,
     convertPackagePrice
 };
