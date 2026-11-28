@@ -8,9 +8,6 @@ const formTitle = document.getElementById("form-title");
 const formSubmit = document.getElementById("form-submit");
 const formCancel = document.getElementById("form-cancel");
 const searchForm = document.getElementById("search-form");
-const staffStatus = document.getElementById("staff-status");
-const staffLoginForm = document.getElementById("staff-login-form");
-const staffLogoutButton = document.getElementById("staff-logout");
 
 const CURRENCIES = ["USD", "EUR", "GBP", "SAR", "AED", "KWD"];
 
@@ -23,88 +20,17 @@ function showMessage(text, isError = false) {
 }
 
 // ------------------------------------------
-// Staff login (team Cognito user pool)
+// Staff login: the team login page (login.html) and js/auth.js.
+// Customers only browse; staff also see "Manage packages" and the create/edit form.
+// The API checks the token again (401 = not logged in, 403 = not staff).
 // ------------------------------------------
 
-function decodeToken(token) {
-    try {
-        const payload = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
-        return JSON.parse(atob(payload));
-    } catch {
-        return null;
-    }
-}
-
-// Returns the staff token saved by the team login, or null if missing/expired
-function getStaffToken() {
-    let token = null;
-    try {
-        token = localStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
-    } catch {
-        return null;
-    }
-
-    const claims = token ? decodeToken(token) : null;
-    if (!claims || !claims.exp || claims.exp * 1000 <= Date.now()) {
-        return null;
-    }
-    return token;
-}
-
-function getStaffName() {
-    const claims = decodeToken(getStaffToken() || "");
-    return claims ? (claims.email || claims["cognito:username"] || "staff") : null;
-}
-
-async function signIn(username, password) {
-    if (!COGNITO_CLIENT_ID) {
-        throw new Error("COGNITO_CLIENT_ID is not set in js/config.js. Run the deploy script or use the team login page.");
-    }
-
-    const response = await fetch(COGNITO_ENDPOINT, {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/x-amz-json-1.1",
-            "X-Amz-Target": "AWSCognitoIdentityProviderService.InitiateAuth"
-        },
-        body: JSON.stringify({
-            AuthFlow: "USER_PASSWORD_AUTH",
-            ClientId: COGNITO_CLIENT_ID,
-            AuthParameters: { USERNAME: username, PASSWORD: password }
-        })
-    });
-
-    const result = await response.json().catch(() => ({}));
-    if (!response.ok || !result.AuthenticationResult) {
-        throw new Error(result.message || result.Message || "Sign in failed.");
-    }
-
-    localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, result.AuthenticationResult.IdToken);
-}
-
-function signOut() {
-    try {
-        localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
-    } catch {
-        // storage not available; nothing to clear
-    }
-    stopEditing();
-    updateStaffView();
-}
-
 function updateStaffView() {
-    const staffName = getStaffName();
-    const signedIn = Boolean(staffName);
+    const staff = isStaff(getSession());
+    createSection.hidden = !staff;
+    manageSection.hidden = !staff;
 
-    staffStatus.textContent = signedIn
-        ? `Signed in as ${staffName}.`
-        : "Not signed in. Creating, editing and publishing packages needs a staff account.";
-    staffLoginForm.hidden = signedIn;
-    staffLogoutButton.hidden = !signedIn;
-    createSection.hidden = !signedIn;
-    manageSection.hidden = !signedIn;
-
-    if (signedIn) {
+    if (staff) {
         loadManageList();
     } else {
         manageList.replaceChildren();
@@ -113,10 +39,8 @@ function updateStaffView() {
 
 // fetch() wrapper that sends the staff token and handles expired logins
 async function staffFetch(url, options = {}) {
-    const token = getStaffToken();
-    if (!token) {
-        updateStaffView();
-        throw new Error("Please sign in as staff first.");
+    if (!isStaff(getSession())) {
+        throw new Error("Please sign in with a staff account first.");
     }
 
     const response = await fetch(url, {
@@ -124,14 +48,14 @@ async function staffFetch(url, options = {}) {
         headers: {
             "Content-Type": "application/json",
             ...(options.headers || {}),
-            Authorization: `Bearer ${token}`
+            ...authHeaders()
         }
     });
 
     const result = await response.json().catch(() => ({}));
 
     if (response.status === 401) {
-        signOut();
+        signOut();   // auth.js: clears the login and opens login.html
         throw new Error("Your staff login has expired. Please sign in again.");
     }
     if (response.status === 403) {
@@ -407,24 +331,6 @@ function readPackageForm() {
 // Events
 // ------------------------------------------
 
-staffLoginForm.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    try {
-        staffStatus.textContent = "Signing in...";
-        await signIn(
-            document.getElementById("staff-username").value.trim(),
-            document.getElementById("staff-password").value
-        );
-        staffLoginForm.reset();
-        updateStaffView();
-    } catch (error) {
-        staffStatus.textContent = error.message;
-        console.error(error);
-    }
-});
-
-staffLogoutButton.addEventListener("click", signOut);
-
 searchForm.addEventListener("submit", (event) => {
     event.preventDefault();
     loadPackages();
@@ -469,5 +375,6 @@ packageForm.addEventListener("submit", async (event) => {
     }
 });
 
+showUserBar();
 updateStaffView();
 loadPackages();
