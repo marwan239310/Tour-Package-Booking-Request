@@ -4,6 +4,6 @@ const API_BASE_URL = "http://localhost:4566/restapis/packages-api/dev/_user_requ
 
 // Team staff login (Cognito on Floci)
 const COGNITO_ENDPOINT = "http://localhost:4566/";
-const COGNITO_CLIENT_ID = "";
+const COGNITO_CLIENT_ID = "bd24974de49f496698d8008fce";
 // localStorage key where the team login keeps the staff ID token
 const AUTH_TOKEN_STORAGE_KEY = "staffIdToken";

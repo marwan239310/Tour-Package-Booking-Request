@@ -30,15 +30,15 @@ echo "2/4 Lambda function: $FN (this can take a few minutes)"
 npm run zip --silent || exit 1
 if aws lambda get-function --function-name $FN > /dev/null 2>&1; then
   aws lambda update-function-code --function-name $FN --zip-file fileb://lambda.zip \
-    --cli-read-timeout 300 > /dev/null
+    --cli-read-timeout 0 > /dev/null
   aws lambda wait function-updated-v2 --function-name $FN
   aws lambda update-function-configuration --function-name $FN --handler src/lambda.handler \
-    --timeout 15 --environment "$ENV_VARS" --cli-read-timeout 300 > /dev/null
+    --timeout 15 --environment "$ENV_VARS" --cli-read-timeout 0 > /dev/null
   aws lambda wait function-updated-v2 --function-name $FN
 else
   aws lambda create-function --function-name $FN --runtime nodejs24.x --handler src/lambda.handler \
     --role arn:aws:iam::$ACCOUNT:role/$ROLE --zip-file fileb://lambda.zip --timeout 15 \
-    --environment "$ENV_VARS" --cli-read-timeout 300 > /dev/null
+    --environment "$ENV_VARS" --cli-read-timeout 0 > /dev/null
   aws lambda wait function-active-v2 --function-name $FN
 fi
 aws lambda get-function --function-name $FN --query "Configuration.State" --output text

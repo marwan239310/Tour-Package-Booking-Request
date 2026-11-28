@@ -60,7 +60,7 @@ export AWS_PAGER=""
 export MSYS_NO_PATHCONV=1   # stop Git Bash from rewriting arguments such as "/{proxy+}"
 
 awsf() {
-    aws --endpoint-url "$ENDPOINT_URL" --region "$AWS_REGION" "$@"
+    aws --endpoint-url "$ENDPOINT_URL" --region "$AWS_REGION" --cli-read-timeout 0 "$@"
 }
 
 # Git Bash's aws.exe needs Windows paths for file:// arguments
@@ -136,7 +136,7 @@ rm -f "$BUILD_DIR"/.env "$BUILD_DIR"/*.zip
 
 (cd "$BUILD_DIR" && npm ci --omit=dev --no-audit --no-fund)
 
-node "$BUILD_DIR/scripts/zip-lambda.js" "$BUILD_DIR" "$ZIP_FILE"
+node "$(native_path "$BUILD_DIR")/scripts/zip-lambda.js" "$(native_path "$BUILD_DIR")" "$(native_path "$ZIP_FILE")"
 
 if [[ "$BUILD_ONLY" == "1" ]]; then
     mkdir -p "$SERVICE_DIR/dist"
@@ -406,7 +406,7 @@ const COGNITO_CLIENT_ID = ${JSON.stringify(e.COGNITO_CLIENT_ID || "")};
 const AUTH_TOKEN_STORAGE_KEY = "staffIdToken";
 `;
 fs.writeFileSync(file, text);
-' "$FRONTEND_CONFIG"
+' "$(native_path "$FRONTEND_CONFIG")"
     echo "config.js now uses $API_URL"
 fi
 
