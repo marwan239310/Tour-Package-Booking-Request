@@ -12,19 +12,65 @@
             <p>Explore available tour packages</p>
         </header>
         <main>
+            <section id="staff-section">
+                <h2>Staff login</h2>
+                <p id="staff-status">Not signed in. Creating, editing and publishing packages needs a staff account.</p>
+                <form id="staff-login-form">
+                    <label for="staff-username">Username or email</label>
+                    <input type="text" id="staff-username" autocomplete="username" required>
+
+                    <label for="staff-password">Password</label>
+                    <input type="password" id="staff-password" autocomplete="current-password" required>
+
+                    <button type="submit">Sign in</button>
+                </form>
+                <button type="button" id="staff-logout" hidden>Sign out</button>
+            </section>
+
             <section id="packages-section">
                 <h2>Available Packages</h2>
-                <p id="message"></p>
+
+                <form id="search-form" class="search-form" novalidate>
+                    <div>
+                        <label for="search-destination">Destination</label>
+                        <input type="text" id="search-destination" placeholder="e.g. Alex" maxlength="60">
+                    </div>
+                    <div>
+                        <label for="search-start">Starting from</label>
+                        <input type="date" id="search-start">
+                    </div>
+                    <div>
+                        <label for="search-end">Ending by</label>
+                        <input type="date" id="search-end">
+                    </div>
+                    <div>
+                        <label for="search-max-price">Max price (EGP)</label>
+                        <input type="number" id="search-max-price" min="0" step="1">
+                    </div>
+                    <div class="search-buttons">
+                        <button type="submit">Search</button>
+                        <button type="button" id="search-clear" class="secondary">Clear</button>
+                    </div>
+                </form>
+
+                <p id="message" role="status"></p>
                 <div id="packages-list"></div>
             </section>
-            <section id="create-package-section">
-                <h2>Create a tour package</h2>
+
+            <section id="manage-section" hidden>
+                <h2>Manage packages (staff)</h2>
+                <p>All packages, including drafts. Customers only see published packages.</p>
+                <div id="manage-list"></div>
+            </section>
+
+            <section id="create-package-section" hidden>
+                <h2 id="form-title">Create a tour package</h2>
                 <form id="package-form">
                     <label for="title">Package Title</label>
-                    <input type="text" id="title" required>
+                    <input type="text" id="title" maxlength="100" required>
 
                     <label for="destination">Destination</label>
-                    <input type="text" id="destination" required>
+                    <input type="text" id="destination" maxlength="60" required>
 
                     <label for="startDate">Start Date</label>
                     <input type="date" id="startDate" required>
@@ -33,14 +79,21 @@
                     <input type="date" id="endDate" required>
 
                     <label for="price">Price (EGP)</label>
-                    <input type="number" id="price" min="0" required>
+                    <input type="number" id="price" min="0" step="0.01" required>
 
                     <label for="totalSeats">Total Seats</label>
-                    <input type="number" id="totalSeats" min="1" required>
+                    <input type="number" id="totalSeats" min="1" max="1000" step="1" required>
 
                     <label for="itinerary">Itinerary (one activity per line) </label>
                     <textarea id="itinerary" required></textarea>
-                    <button type="submit">Create Package</button>
+
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="publishNow">
+                        Published (customers can see and book it)
+                    </label>
+
+                    <button type="submit" id="form-submit">Create Package</button>
+                    <button type="button" id="form-cancel" class="secondary" hidden>Cancel editing</button>
                 </form>
             </section>
         </main>

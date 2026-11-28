@@ -11,3 +11,9 @@ build/
 coverage/
 
 infra/floci/data/
+
+# Generated Lambda deployment and test files
+*.zip
+lambda-response.json
+lambda-health-response.json
+lambda-packages-response.json

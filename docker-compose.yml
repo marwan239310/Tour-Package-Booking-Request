@@ -1,4 +1,3 @@
-
 services:
   package-service:
     build:
@@ -8,13 +7,20 @@ services:
     ports:
       - "3001:3001"
     env_file:
-      - ./package_service/src/.env
+      - path: ./package_service/src/.env
+        required: false
     environment:
       - PORT=3001
       - AWS_REGION=us-east-1
       - AWS_ACCESS_KEY_ID=test
       - AWS_SECRET_ACCESS_KEY=test
       - DYNAMODB_ENDPOINT=http://host.docker.internal:4566
+      # Staff login (team Cognito pool on Floci); set these in your shell or .env
+      - COGNITO_ISSUER=${COGNITO_ISSUER:-}
+      - COGNITO_JWKS_URL=${COGNITO_JWKS_URL:-}
+      - COGNITO_CLIENT_ID=${COGNITO_CLIENT_ID:-}
+      - STAFF_GROUP=${STAFF_GROUP:-staff}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:8080,http://localhost:4566}
     restart: unless-stopped
 
   frontend:
