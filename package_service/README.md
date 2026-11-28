@@ -1,338 +1,239 @@
 # Package Service
 
-
-
 ## 1. Overview
 
-
-
-The Package Service manages tour packages in the Tour Package Booking Request System.
-
-
+The Package Service is responsible for managing tour packages in the Tour Package Booking Request System.
 
 It provides REST API endpoints to create, retrieve, update, and manage tour packages and their available seats.
 
-
+The service uses AWS DynamoDB for data storage and FLOCI for local cloud-service emulation.
 
 ## 2. Architecture
 
-
-
-The service uses the following architecture:
-
-
+The deployment architecture is:
 
 **Frontend → FLOCI API Gateway → FLOCI Lambda → DynamoDB**
 
-
-
-Technologies:
+Technologies used:
 
 - Node.js
-
 - Express.js
-
-- AWS Lambda
-
-- API Gateway HTTP API
-
+- AWS SDK for JavaScript
 - Amazon DynamoDB
-
-- AWS SDK for JavaScript v3
-
-- serverless-http
-
+- AWS Lambda
+- API Gateway
 - FLOCI
-
-
+- Docker
 
 ## 3. Project Structure
 
-
-
 ```text
-
 package_service/
-
+│
+├── README.md
 ├── infra/
-
 │   └── deploy-lambda.sh
-
-├── src/
-
-│   ├── config/
-
-│   │   └── dynamodb.js
-
-│   ├── controllers/
-
-│   ├── routes/
-
-│   ├── scripts/
-
-│   │   └── create-packages-table.js
-
-│   ├── services/
-
-│   ├── lambda.js
-
-│   ├── server.js
-
-│   ├── package.json
-
-│   └── package-lock.json
-
-└── README.md
-
+│
+└── src/
+    ├── config/
+    │   └── dynamodb.js
+    │
+    ├── controllers/
+    │   └── packageController.js
+    │
+    ├── routes/
+    │   └── packageRoutes.js
+    │
+    ├── services/
+    │   └── packageService.js
+    │
+    ├── scripts/
+    │   ├── create-packages-table.js
+    │   └── seed-packages.js
+    │
+    ├── lambda.js
+    ├── server.js
+    ├── package.json
+    └── package-lock.json
 ```
-
-
 
 ## 4. Database Configuration
 
+The service uses DynamoDB with a table named:
 
+`Packages`
 
-The service uses DynamoDB through the AWS SDK.
+The table partition key is:
 
+`packageId` (String)
 
+Package attributes include:
 
-- **Table name:** `Packages`
+- packageId
+- title
+- destination
+- itinerary
+- startDate
+- endDate
+- price
+- totalSeats
+- seatsLeft
+- isPublished
 
-- **Partition key:** `packageId` (String)
+The DynamoDB configuration supports both local FLOCI and other AWS-compatible environments through environment variables.
 
-- **Local FLOCI endpoint:** `http://localhost:4566`
+For local FLOCI development, the DynamoDB endpoint is:
 
-- **Lambda DynamoDB endpoint:** `http://host.docker.internal:4566`
+`http://localhost:4566`
 
+For Lambda running inside FLOCI, the endpoint is:
 
-
-Lambda environment variables:
-
-
-
-```text
-
-DYNAMODB_TABLE=Packages
-
-DYNAMODB_ENDPOINT=http://host.docker.internal:4566
-
-```
-
-
+`http://host.docker.internal:4566`
 
 ## 5. Prerequisites
 
+Before running the service, make sure you have:
 
-
-The following tools are required:
-
-
-
-- Node.js and npm
-
-- Git Bash
-
-- Docker Desktop
-
-- FLOCI
-
-- AWS CLI
-
-- PowerShell
-
-
-
-The AWS CLI must have a FLOCI profile named `floci`, configured for region `us-east-1`.
-
-
+- Node.js and npm installed.
+- Docker Desktop installed and running.
+- FLOCI running.
+- AWS CLI installed.
+- The `floci` AWS CLI profile configured.
 
 ## 6. Install Dependencies
 
+Open a terminal inside:
 
+`package_service/src`
 
-From the project root:
-
-
+Run:
 
 ```bash
-
-cd package_service/src
-
 npm install
-
 ```
 
+## 7. Create DynamoDB Table
 
+Make sure FLOCI is running and the AWS CLI profile is configured.
 
-## 7. Create the DynamoDB Table
-
-
-
-Make sure FLOCI is running.
-
-
-
-From `package_service/src`, execute:
-
-
+Set the local environment:
 
 ```bash
+export AWS_PROFILE=floci
+export DYNAMODB_ENDPOINT=http://localhost:4566
+export MSYS_NO_PATHCONV=1
+```
 
+Create the DynamoDB table by running:
+
+```bash
 npm run create-table
-
 ```
 
+The script creates the `Packages` table if it does not already exist.
 
+If the table already exists, the script reports that it is already available.
 
-The script creates the `Packages` table if it does not already exist. If the table already exists, it reports that and leaves it unchanged.
+## 8. Seed Sample Packages
 
-
-
-## 8. Run the Service Locally
-
-
-
-From `package_service/src`, run:
-
-
+To insert sample tour packages into the DynamoDB table, run:
 
 ```bash
+npm run seed
+```
 
+The seed script provides three sample packages:
+
+- Giza Pyramids Adventure
+- Alexandria Weekend
+- Cairo City Adventure
+
+The script uses fixed package IDs and checks existing packages by title and destination before inserting.
+
+Existing sample packages are skipped to prevent duplicate records.
+
+This allows the same seed command to be used on a fresh database or an existing database without overwriting existing package records.
+
+Make sure FLOCI is running and the AWS profile and DynamoDB endpoint are configured before running the script.
+
+## 9. Run Locally
+
+From `package_service/src`, configure the local FLOCI environment:
+
+```bash
+export AWS_PROFILE=floci
+export DYNAMODB_ENDPOINT=http://localhost:4566
+export MSYS_NO_PATHCONV=1
+```
+
+Start the service:
+
+```bash
 npm start
-
 ```
 
+The local package service runs on port `3001`.
 
+## 10. Deploy Using FLOCI
 
-## 9. Deploy to FLOCI Lambda
+The Package Service is deployed using FLOCI Lambda and API Gateway.
 
+The deployment script is located at:
 
+`package_service/infra/deploy-lambda.sh`
 
-Make sure Docker Desktop and FLOCI are running and the AWS CLI `floci` profile is configured.
+The Lambda configuration uses:
 
+- Function name: `PackageServiceLambda`
+- Runtime: `nodejs24.x`
+- Handler: `lambda.handler`
+- DynamoDB table: `Packages`
+- DynamoDB endpoint: `http://host.docker.internal:4566`
 
+The deployment script prepares the Lambda package, installs production dependencies, creates the deployment ZIP file, configures the Lambda environment, and uploads the code.
 
-From the project root, execute:
-
-
+Run the deployment script from the repository root using the supported Git Bash environment:
 
 ```bash
-
 bash package_service/infra/deploy-lambda.sh
-
 ```
 
+## 11. API Endpoints
 
-
-The deployment script:
-
-
-
-1\. Prepares a temporary deployment directory.
-
-2\. Installs production dependencies.
-
-3\. Creates and validates the Lambda ZIP archive.
-
-4\. Updates the Lambda environment variables.
-
-5\. Uploads the deployment package to FLOCI Lambda.
-
-
-
-- **Lambda function:** `PackageServiceLambda`
-
-- **Lambda handler:** `lambda.handler`
-
-
-
-## 10. API Endpoints
-
-
+The Package Service provides the following endpoints:
 
 | Method | Endpoint | Description |
-
 |---|---|---|
+| GET | `/` | Check the package server |
+| GET | `/health` | Check service and database health |
+| GET | `/packages` | Retrieve all published packages |
+| POST | `/packages` | Create a new package |
+| GET | `/packages/:packageID` | Retrieve a package by ID |
+| PUT | `/packages/:packageID` | Update package information |
+| PATCH | `/packages/:packageID/seats` | Update available seats |
+| PATCH | `/packages/:packageID/reserve` | Reserve seats |
+| PATCH | `/packages/:packageID/release` | Release reserved seats |
+| GET | `/packages/:packageID/convert` | Convert package information |
 
-| GET | `/` | Service information |
+## 12. Testing
 
-| GET | `/health` | Checks service and DynamoDB connectivity |
+The following operations have been tested successfully through the FLOCI API Gateway:
 
-| GET | `/packages` | Retrieves all packages |
+- GET `/health` — returned HTTP 200 and confirmed DynamoDB connectivity.
+- GET `/packages` — retrieved package records.
+- POST `/packages` — created a new package.
+- GET `/packages/:packageID` — retrieved a package by ID.
+- PUT `/packages/:packageID` — updated package information.
+- PATCH `/packages/:packageID/reserve` — successfully reserved seats.
+- PATCH `/packages/:packageID/release` — successfully released seats.
 
-| POST | `/packages` | Creates a package |
+The seed script was also tested against the existing database. It correctly skipped all three sample packages because they were already present.
 
-| GET | `/packages/:packageID` | Retrieves one package |
+## 13. Notes
 
-| PUT | `/packages/:packageID` | Updates a package |
-
-| PATCH | `/packages/:packageID/seats` | Updates package seat availability |
-
-| PATCH | `/packages/:packageID/reserve` | Reserves seats |
-
-| PATCH | `/packages/:packageID/release` | Releases reserved seats |
-
-| GET | `/packages/:packageID/convert` | Converts package information |
-
-
-
-## 11. Testing
-
-
-
-The service was tested through the FLOCI API Gateway endpoint.
-
-
-
-The following operations were successfully tested:
-
-
-
-- Health check and DynamoDB connectivity.
-
-- Retrieving all packages.
-
-- Creating a new package.
-
-- Retrieving a package by its ID.
-
-- Updating package information.
-
-- Reserving seats.
-
-- Releasing reserved seats.
-
-
-
-Example health-check response:
-
-
-
-```json
-
-{
-
-&#x20; "status": "OK",
-
-&#x20; "database": "DynamoDB Connected"
-
-}
-
-```
-
-
-
-## 12. Important Notes
-
-
-
-- FLOCI must be running before deploying or testing the service.
-
-- The Lambda function must use `http://host.docker.internal:4566` to reach DynamoDB.
-
-- Do not use `localhost` as the DynamoDB endpoint inside the Lambda container.
-
-- The deployment script excludes local `.env` files from the deployment package.
-
-- The DynamoDB table must exist before the service can retrieve or store packages.
-
+- FLOCI must be running before local database operations.
+- The DynamoDB table must exist before inserting or retrieving packages.
+- The local DynamoDB endpoint is different from the endpoint used by Lambda.
+- The seed script does not overwrite existing packages.
+- The `Packages` table uses `packageId` as its partition key.
+- Generated deployment ZIP files and temporary test artifacts should not be committed to Git.

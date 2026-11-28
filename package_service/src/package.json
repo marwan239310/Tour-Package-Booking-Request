@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node server.js",
     "zip": "node scripts/zip-lambda.js",
-    "create-table": "node scripts/create-packages-table.js"
+    "create-table": "node scripts/create-packages-table.js",
+    "seed": "node scripts/seed-packages.js"
   },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.1177.0",
