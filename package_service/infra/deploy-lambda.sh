@@ -397,13 +397,8 @@ const e = process.env;
 const file = process.argv[1];
 const text = `// Written by package_service/infra/deploy-lambda.sh. Safe to edit by hand.
 // Package Service API on Floci (API Gateway -> Lambda -> DynamoDB)
+// The team login settings are in auth-config.js (written by infra/cognito/setup-cognito.sh).
 const API_BASE_URL = ${JSON.stringify(e.API_URL)};
-
-// Team staff login (Cognito on Floci)
-const COGNITO_ENDPOINT = ${JSON.stringify(e.ENDPOINT_URL + "/")};
-const COGNITO_CLIENT_ID = ${JSON.stringify(e.COGNITO_CLIENT_ID || "")};
-// localStorage key where the team login keeps the staff ID token
-const AUTH_TOKEN_STORAGE_KEY = "staffIdToken";
 `;
 fs.writeFileSync(file, text);
 ' "$(native_path "$FRONTEND_CONFIG")"

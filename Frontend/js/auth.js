@@ -96,11 +96,21 @@ function authHeaders() {
     return session ? { Authorization: `Bearer ${session.idToken}` } : {};
 }
 
-// Show "email (role) | Sign out" in the page header
+// Navigation bar: "Sign in" when nobody is logged in, otherwise "email (role) | Sign out"
 function showUserBar() {
-    const session = getSession();
     const nav = document.querySelector(".top-nav");
-    if (!session || !nav) return;
+    if (!nav) return;
+    const session = getSession();
+
+    if (!session) {
+        const thisPage = window.location.pathname.split("/").pop() || "index.html";
+        const link = document.createElement("a");
+        link.href = `login.html?next=${encodeURIComponent(thisPage)}`;
+        link.textContent = "Sign in";
+        nav.appendChild(link);
+        return;
+    }
+
     const who = document.createElement("span");
     who.className = "user-info";
     who.textContent = `${session.email} (${isStaff(session) ? "staff" : "customer"})`;

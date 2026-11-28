@@ -5,28 +5,20 @@
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Tour Package Booking</title>
         <link rel="stylesheet" href="css/style.css">
+        <link rel="stylesheet" href="css/auth.css">
     </head>
     <body>
         <header>
             <h1>Tour Package Booking</h1>
             <p>Explore available tour packages</p>
+            <nav class="top-nav">
+                <a href="index.html" class="active">Packages</a>
+                <a href="booking.html">Book a tour</a>
+                <a href="my-bookings.html">My requests</a>
+                <a href="staff.html">Staff</a>
+            </nav>
         </header>
         <main>
-            <section id="staff-section">
-                <h2>Staff login</h2>
-                <p id="staff-status">Not signed in. Creating, editing and publishing packages needs a staff account.</p>
-                <form id="staff-login-form">
-                    <label for="staff-username">Username or email</label>
-                    <input type="text" id="staff-username" autocomplete="username" required>
-
-                    <label for="staff-password">Password</label>
-                    <input type="password" id="staff-password" autocomplete="current-password" required>
-
-                    <button type="submit">Sign in</button>
-                </form>
-                <button type="button" id="staff-logout" hidden>Sign out</button>
-            </section>
-
             <section id="packages-section">
                 <h2>Available Packages</h2>
 
@@ -59,7 +51,7 @@
 
             <section id="manage-section" hidden>
                 <h2>Manage packages (staff)</h2>
-                <p>All packages, including drafts. Customers only see published packages.</p>
+                <p>You are signed in as staff. All packages, including drafts. Customers only see published packages.</p>
                 <div id="manage-list"></div>
             </section>
 
@@ -98,6 +90,8 @@
             </section>
         </main>
         <script src="js/config.js" defer></script>
+        <script src="js/auth-config.js" defer></script>
+        <script src="js/auth.js" defer></script>
         <script src="js/app.js" defer></script>
     </body>
 </html>
