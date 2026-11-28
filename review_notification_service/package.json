@@ -1,0 +1,25 @@
+{
+  "name": "review_notification_service",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node src/server.js",
+    "zip": "node scripts/zip-lambda.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.1177.0",
+    "@aws-sdk/client-secrets-manager": "^3.1177.0",
+    "@aws-sdk/client-sns": "^3.1177.0",
+    "@aws-sdk/lib-dynamodb": "^3.1177.0",
+    "cors": "^2.8.6",
+    "dotenv": "^18.0.10",
+    "express": "^4.22.3",
+    "serverless-http": "^3.2.0"
+  }
+}

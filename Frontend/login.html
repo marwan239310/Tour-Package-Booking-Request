@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Sign In - Tour Package Booking</title>
+        <link rel="stylesheet" href="css/style.css">
+        <link rel="stylesheet" href="css/auth.css">
+    </head>
+    <body>
+        <header>
+            <h1>Sign In</h1>
+            <p>Customers and staff sign in here</p>
+            <nav class="top-nav">
+                <a href="index.html">Packages</a>
+                <a href="booking.html">Book a tour</a>
+                <a href="my-bookings.html">My requests</a>
+                <a href="staff.html">Staff</a>
+            </nav>
+        </header>
+        <main>
+            <section class="login-box">
+                <h2>Sign in to your account</h2>
+                <form id="login-form" novalidate>
+                    <label for="email">Email</label>
+                    <input type="email" id="email" autocomplete="username" required>
+
+                    <label for="password">Password</label>
+                    <input type="password" id="password" autocomplete="current-password" required>
+
+                    <button type="submit" id="login-button">Sign in</button>
+                </form>
+                <p id="message" role="status"></p>
+                <p class="demo-accounts">
+                    Demo accounts: <strong>staff@tourbooking.test</strong> (staff) and
+                    <strong>customer@tourbooking.test</strong> (customer).
+                </p>
+            </section>
+        </main>
+        <script src="js/auth-config.js" defer></script>
+        <script src="js/auth.js" defer></script>
+        <script src="js/login.js" defer></script>
+    </body>
+</html>

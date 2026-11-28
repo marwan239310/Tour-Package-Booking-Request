@@ -1,0 +1,82 @@
+/* Extra styles for the booking pages (booking.html, my-bookings.html) */
+.top-nav {
+    margin-top: 14px;
+    display: flex;
+    justify-content: center;
+    gap: 18px;
+    flex-wrap: wrap;
+}
+.top-nav a {
+    color: #d6e6f2;
+    text-decoration: none;
+    font-weight: bold;
+}
+.top-nav a.active,
+.top-nav a:hover {
+    color: white;
+    text-decoration: underline;
+}
+select {
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    font-size: 15px;
+}
+.summary,
+.hint {
+    color: #174a6e;
+    font-size: 14px;
+}
+#message.success { color: #1b7a3a; }
+#message.error { color: #b3261e; }
+.bookings-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 20px;
+}
+.booking-card {
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 18px;
+}
+.status-badge {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 13px;
+    background: #e8eef4;
+    color: #174a6e;
+    vertical-align: middle;
+}
+.status-pending { background: #fff4d6; color: #8a5a00; }
+.status-under_review { background: #e3f0ff; color: #0b4f8a; }
+.status-confirmed,
+.status-accepted { background: #def5e5; color: #1b7a3a; }
+.status-awaiting_payment { background: #f3e8ff; color: #6b2fa3; }
+.status-rejected,
+.status-cancelled { background: #fde4e2; color: #b3261e; }
+.card-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    margin-top: 10px;
+}
+.card-actions input {
+    width: 80px;
+}
+.card-actions button {
+    margin-top: 0;
+    padding: 8px 12px;
+    font-size: 14px;
+}
+button.secondary { background-color: #5b7a93; }
+button.danger { background-color: #b3261e; }
+button.danger:hover { background-color: #8c1d17; }
+button:disabled { opacity: 0.6; cursor: wait; }
+.history {
+    margin: 12px 0 0 18px;
+    font-size: 14px;
+    color: #333;
+}

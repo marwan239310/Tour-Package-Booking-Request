@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Staff - Booking Requests</title>
+        <link rel="stylesheet" href="css/style.css">
+        <link rel="stylesheet" href="css/staff.css">
+        <link rel="stylesheet" href="css/auth.css">
+    </head>
+    <body>
+        <header>
+            <h1>Staff: Booking Requests</h1>
+            <p>Review requests, change their status and notify customers</p>
+            <nav class="top-nav">
+                <a href="index.html">Packages</a>
+                <a href="booking.html">Book a tour</a>
+                <a href="my-bookings.html">My requests</a>
+                <a href="staff.html" class="active">Staff</a>
+            </nav>
+        </header>
+        <main>
+            <section>
+                <h2>Dashboard</h2>
+                <p class="hint">Click a box to show only the requests with that status.</p>
+                <div id="counts" class="counts"></div>
+            </section>
+            <section>
+                <h2>Filter Requests</h2>
+                <form id="filter-form" class="filters" novalidate>
+                    <div>
+                        <label for="status-filter">Status</label>
+                        <select id="status-filter">
+                            <option value="">All statuses</option>
+                            <option value="pending">Pending</option>
+                            <option value="under_review">Under review</option>
+                            <option value="confirmed">Confirmed</option>
+                            <option value="awaiting_payment">Awaiting payment</option>
+                            <option value="accepted">Accepted</option>
+                            <option value="rejected">Rejected</option>
+                            <option value="cancelled">Cancelled</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="package-filter">Package ID</label>
+                        <input type="text" id="package-filter" placeholder="e.g. PKG-1">
+                    </div>
+                    <div>
+                        <label for="date-filter">Request date</label>
+                        <input type="date" id="date-filter">
+                    </div>
+                    <div>
+                        <button type="submit">Show Requests</button>
+                        <button type="button" id="clear-filters" class="secondary">Clear filters</button>
+                    </div>
+                </form>
+            </section>
+            <section>
+                <h2>Requests</h2>
+                <p id="message" role="status"></p>
+                <div id="requests-list" class="requests-list"></div>
+            </section>
+        </main>
+        <script src="js/staff-config.js" defer></script>
+        <script src="js/auth-config.js" defer></script>
+        <script src="js/auth.js" defer></script>
+        <script src="js/staff.js" defer></script>
+    </body>
+</html>

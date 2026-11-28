@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Book a Tour</title>
+        <link rel="stylesheet" href="css/style.css">
+        <link rel="stylesheet" href="css/booking.css">
+    </head>
+    <body>
+        <header>
+            <h1>Book a Tour</h1>
+            <p>Send a booking request for one of our packages</p>
+            <nav class="top-nav">
+                <a href="index.html">Packages</a>
+                <a href="booking.html" class="active">Book a tour</a>
+                <a href="my-bookings.html">My requests</a>
+            </nav>
+        </header>
+        <main>
+            <section>
+                <h2>Booking Request</h2>
+                <p id="message" role="status"></p>
+                <form id="booking-form" novalidate>
+                    <label for="packageID">Package</label>
+                    <select id="packageID" required>
+                        <option value="">Loading packages...</option>
+                    </select>
+                    <div id="package-summary" class="summary" hidden></div>
+
+                    <label for="customerName">Full Name</label>
+                    <input type="text" id="customerName" minlength="3" maxlength="80" required>
+
+                    <label for="customerEmail">Email (we send status updates here)</label>
+                    <input type="email" id="customerEmail" required>
+
+                    <label for="phone">Phone Number</label>
+                    <input type="tel" id="phone" placeholder="01012345678" required>
+
+                    <label for="travelers">Number of Travelers</label>
+                    <input type="number" id="travelers" min="1" max="10" value="1" required>
+
+                    <p id="total-price" class="hint"></p>
+
+                    <label for="note">Note for the agency (optional)</label>
+                    <textarea id="note" maxlength="300" placeholder="Room preferences, questions..."></textarea>
+
+                    <button type="submit" id="submit-button">Send Booking Request</button>
+                </form>
+            </section>
+        </main>
+        <script src="js/config.js" defer></script>
+        <script src="js/booking.js" defer></script>
+    </body>
+</html>
